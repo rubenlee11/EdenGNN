@@ -1,0 +1,48 @@
+run:
+  nproc: 1
+
+band:
+  # post process of E3SR, for example nscf calculations
+  dir: "/root/research/e3super-resolution/result/e3sr/2025-11-17-19-46-03/predict/*" # stores chgcars
+  dir_scf:
+  path: # json file. If None, dir should use regular expression *
+  save_dir: "/root/dataset/molecular_dynamics/si/vasp_run_predict"
+  task: 3
+
+dataset:
+  filelist: "" # txt files containing poscar paths
+  save_dir: ""
+
+get_poscar:
+  api_key: "3GsNP6XysKmESBOMJBN9Bdtnx9sD92RW"
+  save_dir: "/root/dataset/mp_mos2/poscar"
+  random_perturb: 0.1
+  num_sampling: 10
+
+check:
+  filelist: ""
+  save_path: "" # save json file
+
+sad:
+  filelist: "" # poscar files
+  save_dir: "/root/research/e3super-resolution/si/vasp_run"
+
+mv:
+  filelist: "" # dirs of calculations
+  
+stat:
+  # Analyze VASP calculations from vasp_band.py
+  plot_bs: False
+  save_dir: /root/dataset/molecular_dynamics/si/
+
+incar:
+  encut: 520.0
+  algo: "Normal"
+  prec: "Normal"
+  ismear: -5
+  sigma: 0.05
+  lmaxmix: 6
+
+kpoints:
+  line_density: 20
+  mp: [6,6,6]

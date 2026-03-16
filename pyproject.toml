@@ -1,0 +1,14 @@
+[build-system]
+build-backend = "mesonpy"
+requires = ["meson-python", "ninja", "numpy>=1.26.0"]
+
+[project]
+name = "edengnn"
+version = "0.1.0"
+authors = [
+  { name="Xiwen Li", email="lixiwen2718@gmail.com" },
+]
+dependencies = [
+    "numpy",
+]
+description = "EdenGNN: An Efficient E(3)-Equivariant Graph Neural Network for Charge Density Prediction"
