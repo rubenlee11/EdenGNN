@@ -67,7 +67,7 @@ Run VASP to obtain the Superposition of Atomic Charge Density (SACD). This serve
 #### 2. Calculate Self-Consistent CHGCAR (Training Only)
 
 Perform normal self-consistent VASP calculations to generate the ground truth data.
-- **Consistency is Key:** Ensure the precision settings match those used in the SACD calculations (except for `KPOINTS` and `ISMEAR`). Inconsistent grids between pseudo charge densities will raise errors.
+- **Note:** Ensure the precision settings match those used in the SACD calculations (except for `KPOINTS` and `ISMEAR`). Inconsistent grids between pseudo charge densities will raise errors.
 - **Precision Recommendation:** For an 80 GB GPU, we recommend using the `PREC = Normal` accuracy level for preparing training datasets and making predictions.
 
 #### 3. Create Filelists
