@@ -4,11 +4,8 @@ run:
 band:
   # post process of E3SR, for example nscf calculations
   dir: "/root/research/e3super-resolution/result/e3sr/2025-11-17-19-46-03/predict/*" # stores chgcars
-  dir_scf:
-  path: # json file. If None, dir should use regular expression *
   save_dir: "/root/dataset/molecular_dynamics/si/vasp_run_predict"
-  task: 3
-
+  
 dataset:
   filelist: "" # txt files containing poscar paths
   save_dir: ""
@@ -26,13 +23,14 @@ check:
 sad:
   filelist: "" # poscar files
   save_dir: "/root/research/e3super-resolution/si/vasp_run"
+  for_band: True
 
 mv:
   filelist: "" # dirs of calculations
   
 stat:
   # Analyze VASP calculations from vasp_band.py
-  plot_bs: False
+  tar_dir:
   save_dir: /root/dataset/molecular_dynamics/si/
 
 incar:

@@ -3,7 +3,7 @@ run:
   device: cuda:0
   num_gpus: 1
   mode: train # Options: "train", "test", "predict"
-  task: 1 # 0: density; 1: augmentation; 2: density & augmentation 
+  task: 2 # 0: density; 1: augmentation; 2: density & augmentation 
   project: edengnn
   name: mp
   save_dir: /root/research/e3super-resolution/result
@@ -13,6 +13,24 @@ run:
   dtype: float32
 
 data:
+  dft_software: "vasp"
+  openmx:
+    # For the generatation of input files in the predicting stage
+    path_template: /root/research/e3super-resolution/EdenGNN_git/scripts/openmx/template.dat
+    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
+    num_proc: 64 # number of cpus used for restart calculations
+    dk_bz: 0.35 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk 
+    dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
+    plot_band: True
+  vasp:
+    lmix_max: 6
+    # for prediction
+    path_template: /root/research/e3super-resolution/EdenGNN_git/scripts/vasp/template.incar
+    path_pp: /root/research/e3super-resolution/EdenGNN_git/scripts/vasp/pp
+    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
+    dk_bz: 0.35 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk 
+    dk_band: 0.038 # the sampling density along high symmetry lines for plotting band structures.
+    plot_band: True
   # ----------------------------------------------------------------------------
   # Dataset Loading Modes:
   # 1. In-Memory Mode (graphdata: True): Loads a pre-processed monolithic .npz 
@@ -21,24 +39,23 @@ data:
   #    Reads and parses individual CHGCAR or binary files from the disk on demand 
   #    during the training loop, based on the provided split lists.
   # ----------------------------------------------------------------------------
-  graphdata: False # 
   dir: /root/dataset/mp_nonmag/vasp_run # directory of scf calculations
-  path_train: /root/dataset/mp_nonmag/nonmag_debug.txt # sad paths
-  path_val: /root/dataset/mp_nonmag/nonmag_debug.txt
+  path_train: /root/dataset/debug/dataset.txt # sad paths
+  path_val: /root/dataset/debug/dataset.txt
   path_test: 
   # ----------------------------------------------------------------------------
   # txt files storing the input SAD CHGCAR paths for inference
   # ----------------------------------------------------------------------------  
-  path_predict: 
-  write_chgcar: True
+  path_predict: /root/dataset/molecular_dynamics/lif/dataset_openmx.txt
   # ----------------------------------------------------------------------------
   # Currently EdenGNN only supports batch size = 1 to avoid OOM. Using batch > 1 
   # will cause serious errors. I have tried batch > 1 with 1D arrays, and found 
   # that it is not efficient for training.
   # ----------------------------------------------------------------------------
+  num_workers: 4 # strongly recommend to set this larger than 1 when using Lazy Loading
   use_bin: False # True if using binary pseudo charge density data
   batch_size: 1 
-  num_workers: 4 # strongly recommend to set this larger than 1 when using Lazy Loading
+  graphdata: False #   
 
 optimize:
   loss_dict:
@@ -82,7 +99,7 @@ optimize:
 
 model:
   task: ${run.task}
-  lmix_max: 6
+  lmix_max: ${data.vasp.lmix_max}
   use_sad: True # whether or not enable training the difference charge density
   atom:
     l_max: 6
@@ -109,6 +126,7 @@ model:
       num_radial_filter_neurons: 20
       num_radial_filter_layers: 2
       n_channels: 4 # the number of radial basis for each angular quantum number.
+    chunk_size: 4000000 # Max probe points per prediction step (limited by GPU memory)
 
 wandb:
   project: ${run.project}

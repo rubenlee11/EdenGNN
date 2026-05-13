@@ -12,9 +12,7 @@ from .nequip.nn import (
     ConvNetLayer,
 )
 from .nequip.nn.nonlinearities import ShiftedSoftPlus
-from edengnn.data.basis_aug import AUG_IRREPS
-
-CHUNK_CRITERION = 20000000
+from edengnn.data.basis_vasp import AUG_IRREPS
 
 
 class DensityLayer(torch.nn.Module):
@@ -38,6 +36,7 @@ class DensityLayer(torch.nn.Module):
         num_radial_filter_layers=2,
         num_radial_filter_neurons=64,
         spin=False,
+        chunk_size=20000000,
     ):
         super().__init__()
 
@@ -46,6 +45,7 @@ class DensityLayer(torch.nn.Module):
         self.l_max = l_max
         self.n_channels = n_channels
         self.dtype = torch.get_default_dtype()
+        self.chunk_size = chunk_size
 
         irreps_probe_features = e3nn.o3.Irreps(
             [
@@ -176,7 +176,7 @@ class DensityLayer(torch.nn.Module):
         # ----------------------------------------------------------------------
         # apply spherical harmonics expansion
         # ----------------------------------------------------------------------
-        if data["npb_total"] <= CHUNK_CRITERION:
+        if data["npb_total"] <= self.chunk_size:
             Y_lm = self.spharm_edges_probe(probe_edge)
             # probe radial filters
             radial_embedding = torch.cat(
@@ -192,7 +192,7 @@ class DensityLayer(torch.nn.Module):
                 Y_lm,
             )
         else:
-            atom_chunk_size = max(1, CHUNK_CRITERION // n_probe)
+            atom_chunk_size = max(1, self.chunk_size // n_probe)
             chunks = []
             for start in range(0, n_atom, atom_chunk_size):
                 end = min(start + atom_chunk_size, n_atom)
@@ -394,6 +394,7 @@ class EfficientDensity(torch.nn.Module):
             "num_radial_filter_layers": config.probe.conv.num_radial_filter_layers,
             "num_radial_filter_neurons": config.probe.conv.num_radial_filter_neurons,
             "spin": False,
+            "chunk_size": config.probe.chunk_size,
         }
         self.probe = DensityLayer(**probe_params)
         self.aug = AugmentationLayer(
@@ -411,10 +412,6 @@ class EfficientDensity(torch.nn.Module):
 
     def _cal_aug(self, data, output):
         self.aug(data)
-        # if self.use_sad:
-        #    aug_tensor = data["node_aug"] + data["aug_tensor_in"]
-        # else:
-        #    aug_tensor = data["node_aug"]
         aug_tensor = data["node_aug"]
         output["aug_tensor"] = aug_tensor
 

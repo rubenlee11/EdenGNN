@@ -2,14 +2,17 @@ import multiprocessing
 from omegaconf import OmegaConf
 from datetime import datetime
 import logging, torch, argparse, os, wandb, time
-from edengnn.data.dataload import get_loader, write_chgcar
-from edengnn.model.model import EfficientDensity
 import lightning as L
-import matplotlib, glob
 from lightning.pytorch.strategies import DDPStrategy
+import matplotlib, glob
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+from edengnn.data.dataload import get_loader
+from edengnn.data.io_vasp import IO_VASP
+from edengnn.data.io_openmx import IO_OpenMX
+from edengnn.model.model import EfficientDensity
 
 colors = plt.cm.tab10.colors
 
@@ -45,6 +48,7 @@ class Model(L.LightningModule):
         }
 
         self.log_every_n_steps = kwargs.get("log_every_n_steps", 1)
+        self.check_val_every_n_epoch = kwargs.get("check_val_every_n_epoch", 1)
         self.log_level = kwargs.get("log_level", 0)
 
         self.val_check_interval_steps = kwargs.get("val_check_interval_steps", None)
@@ -262,11 +266,12 @@ class Model(L.LightningModule):
             "z": batch["z"].detach().cpu().numpy(),
             "pos": batch["pos"].detach().cpu().numpy(),
             "cell": batch["cell"].detach().cpu().numpy(),
-            "lmix_max": batch["lmix_max"].detach().cpu().numpy(),
             "nat": batch["nat"].detach().cpu().numpy(),
             "npb": batch["npb_total"].detach().cpu().numpy(),
             "volume": batch["volume"].detach().cpu().numpy()[0],
         }
+        if "lmix_max" in batch:
+            result["lmix_max"] = batch["lmix_max"].detach().cpu().numpy()[0]
         if self.task == 0:
             result["density"] = output["grid_func_out"].detach().cpu().numpy()
             result["aug"] = None
@@ -325,7 +330,7 @@ class Model(L.LightningModule):
                     ),
                     "monitor": "val/loss",
                     "interval": "epoch",
-                    "frequency": 1,
+                    "frequency": self.check_val_every_n_epoch,
                     "strict": True,
                 }
 
@@ -413,7 +418,7 @@ def main():
         logger=False,
         default_root_dir=save_dir,
         log_every_n_steps=cfg.optimize.get("log_every_n_steps", 10),
-        check_val_every_n_epoch=cfg.run.get("val_every", 1),
+        check_val_every_n_epoch=cfg.optimize.get("check_val_every_n_epoch", 1),
         val_check_interval=cfg.optimize.get("val_check_interval_steps", None),
         gradient_clip_val=cfg.optimize.get("grad_clip", None),
         enable_progress_bar=False,
@@ -423,9 +428,34 @@ def main():
         max_steps=cfg.optimize.get("max_steps", 1000000),
     )
 
+    if cfg.data.dft_software == "openmx":
+        io_dft = IO_OpenMX(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            path_template=cfg.data.openmx.path_template,
+            encut=cfg.data.openmx.encut,
+            num_proc=cfg.data.openmx.num_proc,
+            dk_bz=cfg.data.openmx.dk_bz,
+            dk_band=cfg.data.openmx.dk_band,
+            plot_band=cfg.data.openmx.plot_band,
+        )
+    else:
+        io_dft = IO_VASP(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            dir=cfg.data.dir,
+            use_bin=cfg.data.use_bin,
+            path_template=cfg.data.vasp.path_template,
+            encut=cfg.data.vasp.encut,
+            lmix_max=cfg.data.vasp.lmix_max,
+            dk_bz=cfg.data.vasp.dk_bz,
+            dk_band=cfg.data.vasp.dk_band,
+            plot_band=cfg.data.vasp.plot_band,
+        )
+
     if cfg.run.mode == "train":
-        train_loader = get_loader(cfg, stage="train")
-        val_loader = get_loader(cfg, stage="val")
+        train_loader = get_loader(cfg, stage="train", io_dft=io_dft)
+        val_loader = get_loader(cfg, stage="val", io_dft=io_dft)
         if cfg.run.resume:
             lightning_model = Model(
                 model=model,
@@ -472,13 +502,12 @@ def main():
             **cfg.optimize,
         )
         if cfg.run.mode == "test":
-            loader = get_loader(cfg, stage="test")
+            loader = get_loader(cfg, stage="test", io_dft=io_dft)
             trainer.test(lightning_model, loader)
 
         elif cfg.run.mode == "predict":
-            loader = get_loader(cfg, stage="predict")
-            path_predict = os.path.join(save_dir, "predict")
-            os.makedirs(path_predict, exist_ok=True)
+            loader = get_loader(cfg, stage="predict", io_dft=io_dft)
+
             t_predict_start = time.time()
             predictions = trainer.predict(lightning_model, loader)
             t_predict_total = time.time() - t_predict_start
@@ -486,30 +515,43 @@ def main():
             num_atom_total = 0
             num_pb_total = 0
             MAX_PROCESSES = min(os.cpu_count(), 8) - 1
-            tasks = []
+
+            logger.info(f"[Write]: using {MAX_PROCESSES} cores......")
             t_write_start = time.time()
-            for struct in predictions:
-                task_args = (
-                    path_predict,
-                    struct["name"],
-                    struct["aug"],
-                    struct["density"],
-                    struct["z"],
-                    struct["pos"],
-                    struct["cell"],
-                    struct["volume"],
-                    struct["lmix_max"],
-                )
-                tasks.append(task_args)
-                num_atom_total += struct["nat"]
-                num_pb_total += struct["npb"]
+
+            tasks = []
+            if cfg.data.dft_software == "vasp":
+                for struct in predictions:
+                    task_args = (
+                        struct["name"],
+                        struct["aug"],
+                        struct["density"],
+                        struct["z"],
+                        struct["pos"],
+                        struct["cell"],
+                        struct["volume"],
+                    )
+                    tasks.append(task_args)
+                    num_atom_total += struct["nat"]
+                    num_pb_total += struct["npb"]
+
+                with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
+                    pool.starmap(io_dft.write_density, tasks)
+            elif cfg.data.dft_software == "openmx":
+                for struct in predictions:
+                    task_args = (
+                        struct["name"],
+                        struct["density"],
+                    )
+                    tasks.append(task_args)
+                    num_atom_total += struct["nat"]
+                    num_pb_total += struct["npb"]
+
+                with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
+                    pool.starmap(io_dft.write_density, tasks)
 
             num_atom_total = num_atom_total[0]
             num_pb_total = num_pb_total[0]
-            if cfg.data.write_chgcar:
-                logger.info(f"[Write]: using {MAX_PROCESSES} cores......")
-                with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
-                    pool.starmap(write_chgcar, tasks)
             t_write_total = time.time() - t_write_start
 
             logger.info(

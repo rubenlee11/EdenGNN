@@ -14,13 +14,12 @@ import os
 
 from omegaconf import OmegaConf
 from pymatgen.io.vasp.inputs import Incar, Poscar, Potcar, Kpoints
-from pymatgen.io.vasp.sets import MPRelaxSet
 from pymatgen.core import Structure
 import pathlib, argparse, multiprocessing
 
 KAPPA = 900
 
-from edengnn.data.basis_aug import pseudo_map
+from edengnn.data.basis_vasp import pseudo_map
 
 
 def _vasp_scf(structure, dir_work, cfg):

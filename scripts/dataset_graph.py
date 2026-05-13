@@ -12,7 +12,8 @@ from pymatgen.io.vasp import Chgcar
 from vesin import NeighborList
 from torch_geometric.data import Data
 
-from edengnn.data.dataload import parse_aug, get_mask_r_optimized, pos2n
+from edengnn.data.io_vasp import parse_aug
+from edengnn.data.dataload import get_mask_r, pos2n
 
 DTYPE = torch.float32
 
@@ -21,10 +22,14 @@ parser.add_argument("--dir_total", help="VASP working dir for total density")
 parser.add_argument(
     "--dir_sad", help="VASP working dir for superposition of atomic density"
 )
-parser.add_argument("--filelist_train", help="Paths to sad directories for train")
-parser.add_argument("--filelist_val", help="Paths to sad directories for val")
-parser.add_argument("--path_graph_train", help="Path to train graph file")
-parser.add_argument("--path_graph_val", help="Path to val graph file")
+parser.add_argument(
+    "--filelist_train", help="Paths to sad directories for train", default=None
+)
+parser.add_argument(
+    "--filelist_val", help="Paths to sad directories for val", default=None
+)
+parser.add_argument("--path_graph_train", help="Path to train graph file", default=None)
+parser.add_argument("--path_graph_val", help="Path to val graph file", default=None)
 parser.add_argument("--cutoff", type=float, default=4.0, help="atom graph cutoff")
 parser.add_argument("--radius", type=float, default=4.0, help="probe radius")
 parser.add_argument("--lmix_max", type=int, default=2, help="LMAXMIX in INCAR")
@@ -68,7 +73,7 @@ def create_graph(idx, name, dir_total, dir_sad, cutoff, radius, lmix_max):
     nbr_shift = cell_shift @ cell  # convert to Cartesian
     grid_shape = density_sad.shape
     pos_n, grid = pos2n(cell, grid_shape, pos)
-    map_probe, edge_vec_probes = get_mask_r_optimized(cell, grid_shape, radius)
+    map_probe, edge_vec_probes = get_mask_r(cell, grid_shape, radius)
     npb = len(map_probe)
 
     aug_tensor, aug_mask = parse_aug(aug_lines, z, lmix_max)
@@ -133,9 +138,11 @@ def create_file(filelist, path_save):
 
 def main():
     # train
-    create_file(filelist_train, path_graph_train)
+    if filelist_train is not None:
+        create_file(filelist_train, path_graph_train)
     # val
-    create_file(filelist_val, path_graph_val)
+    if filelist_val is not None:
+        create_file(filelist_val, path_graph_val)
 
 
 if __name__ == "__main__":

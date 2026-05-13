@@ -10,7 +10,6 @@ import os, glob, pathlib, json, argparse, multiprocessing, re
 import numpy as np
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.io.vasp import Chgcar
-from pymatgen.electronic_structure.plotter import BSPlotter
 from pymatgen.electronic_structure.core import Spin
 from omegaconf import OmegaConf
 import matplotlib
@@ -18,7 +17,6 @@ from matplotlib.lines import Line2D
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 # colors = plt.cm.tab10.colors
 colors = ["#6ca4a7", "#f0dfa7", "#7d7a7a", "#c199a2", "#995d6b"]
@@ -344,43 +342,13 @@ def stat_vasprun(work_path, band=False):
 def stat_structure(dir_work, cfg):
     name = pathlib.Path(dir_work).stem
     try:
-        if cfg.stat.plot_bs:
-            dir_band = os.path.join(dir_work, "band")
-            dir_band_scf = os.path.join(dir_work, "band_scf")
-            ax = None
-            if os.path.exists(dir_band) and os.path.exists(dir_band_scf):
-                data_band, bs_band = stat_vasprun(
-                    os.path.join(dir_work, "band"), band=True
-                )
-                data_band_scf, bs_band_scf = stat_vasprun(
-                    os.path.join(dir_work, "band_scf"), band=True
-                )
-                plotter = BSPlotter([bs_band, bs_band_scf])
-                ax = plotter.get_plot(zero_to_efermi=True, bs_labels=["E3SR", "VASP"])
-
-            elif os.path.exists(dir_band):
-                data_band, bs_band = stat_vasprun(
-                    os.path.join(dir_work, "band"), band=True
-                )
-                plotter = BSPlotter(bs_band)
-                ax = plotter.get_plot(zero_to_efermi=True, bs_labels=["E3SR"])
-
-            elif os.path.exists(dir_band_scf):
-                data_band_scf, bs_band_scf = stat_vasprun(
-                    os.path.join(dir_work, "band_scf"), band=True
-                )
-                plotter = BSPlotter(bs_band_scf)
-                ax = plotter.get_plot(zero_to_efermi=True, bs_labels=["E3SR"])
-            else:
-                bs_band_scf = None
-                bs_band = None
-
-            ax.figure.savefig(
-                f"{dir_work}/band_structure.png", dpi=300, bbox_inches="tight"
-            )
-
         path_nscf = os.path.join(dir_work, "nscf")
-        path_scf = os.path.join(dir_work, "scf")
+        if isinstance(cfg.stat.tar_dir, str) and cfg.stat.tar_dir:
+            name = pathlib.Path(dir_work)
+            path_scf = os.path.join(cfg.stat.tar_dir, name, "scf")
+        else:
+            path_scf = os.path.join(dir_work, "scf")
+
         data_nscf, bs = stat_vasprun(path_nscf, band=False)
         data_scf, bs = stat_vasprun(path_scf, band=False)
 

@@ -4,7 +4,7 @@ requires = ["meson-python", "ninja", "numpy>=1.26.0"]
 
 [project]
 name = "edengnn"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
   { name="Xiwen Li", email="lixiwen2718@gmail.com" },
 ]

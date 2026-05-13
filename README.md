@@ -41,13 +41,16 @@ Ensure you have the following dependencies installed in your python environment:
 
 ### Install EdenGNN
 
-Clone the repository and install it via `pip`:
+- Clone the repository and install it via `pip`:
 
 ```bash
 git clone https://github.com/rubenlee11/EdenGNN.git
 cd EdenGNN
 pip install .
+# pip install . --no-index --no-build-isolation
 ```
+
+- Performing non-self-consistent calculations in **OpenMX** with predicted charge density requires some modifications. Please compile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
 
 ## Usage
 
@@ -59,26 +62,47 @@ A complete workflow example can be found in `examples/si`. You can also explore 
 
 ### Data Preparation
 
-#### 1. Calculate SACD CHGCAR
+#### 1. Calculate Superposition of Atomic Charge Density (VASP only)
 
-Run VASP to obtain the Superposition of Atomic Charge Density (SACD). This serves as the physical prior for the $\Delta$-Learning strategy and is **required for both training and prediction**.
+This step is necessary for **VASP** but not **OpenMX**. In self-consistent and non-self-consistent calculations, **OpenMX** stores and reads the difference charge density in the restart files.
+
+Run **VASP** to obtain the Superposition of Atomic Charge Density (SACD). This serves as the physical prior for the $\Delta$-Learning strategy and is **required for both training and prediction**.
 - **VASP Tags:** Set `ICHARG = 12`, `NELM = 0`, and `ISPIN = 1`.
 
-#### 2. Calculate Self-Consistent CHGCAR (Training Only)
+#### 2. Calculate Self-Consistent Charge Density (Training Only)
 
-Perform normal self-consistent VASP calculations to generate the ground truth data.
-- **Consistency is Key:** Ensure the precision settings match those used in the SACD calculations (except for `KPOINTS` and `ISMEAR`). Inconsistent grids between pseudo charge densities will raise errors.
+Perform normal self-consistent DFT calculations to generate the ground truth data.
+- **Consistency is Key:** When using **VASP** to label data, ensure the precision settings match those used in the SACD calculations (except for `KPOINTS` and `ISMEAR`). Inconsistent grids between pseudo charge densities will raise errors.
 - **Precision Recommendation:** For an 80 GB GPU, we recommend using the `PREC = Normal` accuracy level for preparing training datasets and making predictions.
 
 #### 3. Create Filelists
 
-Create text files containing the absolute paths to the directories with your **SACD** CHGCARs for both training and validation sets. 
+Create text files for training, validation, and test sets. 
+
+For **VASP** mode, the filelists should contain the absolute paths to the working directories of the **SACD** calculations.
+
 Example:
 ```text
 /root/.../si/vasp_run_sacd/1_0
 /root/.../si/vasp_run_sacd/1_1
 ...
 ```
+
+For **OpenMX** mode, the filelists should contain the absolute paths to: the working directories of the DFT calculations in the training stage; or the cif files in the prediction stage.
+
+Example:
+```text
+/root/.../si/openmx_run/1_0
+/root/.../si/openmx_run/1_1
+...
+```
+
+```text
+/root/.../si/openmx_run/1_0.cif
+/root/.../si/openmx_run/1_1.cif
+...
+```
+
 
 ### Training
 
@@ -95,14 +119,18 @@ Modify your configuration file with the following key settings:
   
 - **Fine-tuning (Optional):** set `run.checkpoint` to the path of your checkpoint file. 
 
+- **Set `data.dft_software`**.
+
 - **Directories:** 
   - `run.save_dir`: Directory to save logs and checkpoints.
-  - `data.dir`: Directory storing your SCF calculations. Directory names here must match those in your filelists.
+  - `data.dir`: Directory storing your SCF calculations. Directory names here must match those in your filelists. This tag is needed when `data.dft_software` is `vasp`. 
   - `data.path_train` & `data.path_val`: Paths to your training and validation filelists.
 
 - **Optimization:** 
   - Set the initial learning rate via `optimize.lr`.
-  - The total loss is a weighted sum: $\mathcal{L} = \sum_{i} w_i \mathcal{L}_i$. Specify the gradient ratios in `optimize.loss_dict.grid_func_out` and `optimize.loss_dict.aug_tensor` if training both tasks (`run.task: 2`).
+  - The total loss is a weighted sum: $\mathcal{L} = \sum_{i} w_i \mathcal{L}_i$. Specify the gradient ratios in `optimize.loss_dict.grid_func_out` and `optimize.loss_dict.aug_tensor` if training both tasks (`run.task: 2`). When using **OpenMX**, only the charge density is trained, hence the weight of `grid_func_out` is `1.0`.
+
+
 - **Model Parameters:** 
   - Set `model.lmix_max` to match the `LMAXMIX` tag used in your VASP dataset (must be consistent across all structures). 
   - Default values for other model parameters are generally robust.
@@ -115,10 +143,18 @@ python scripts/train.py --config path/to/config.yaml
 ### Prediction
 
 #### 1. Configure `config.yaml`
-- Set `run.mode: predict`.
-- Set `run.checkpoint` to the path of your trained checkpoint file. 
+
+- **Set `run.mode: predict`**.
+
+- **Set `data.dft_software`**.
+
+- **Set `run.checkpoint`** to the path of the checkpoint file of your trained model. 
+
+- **Set `path_predict`** to the filelist (explained in the **Data Preparation** section).
+
+- **Set `path_template`** to the path of the template files of band structure calculation settings for the DFT softwares.
+
 - **Note:** All model hyperparameters in the `config.yaml` (including `run.task`) must strictly match those of the checkpoint.
-- Set `path_predict` to the filelist containing the paths to the SACD calculations of your input structures.
 
 #### 2. Run Prediction
 ```bash
