@@ -47,6 +47,7 @@ Ensure you have the following dependencies installed in your python environment:
 git clone https://github.com/rubenlee11/EdenGNN.git
 cd EdenGNN
 pip install .
+# for offline installation, use:
 # pip install . --no-index --no-build-isolation
 ```
 
