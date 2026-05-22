@@ -2,9 +2,16 @@ import math, pathlib, os, seekpath
 from pymatgen.core import Structure, Lattice
 import numpy as np
 
-from edengnn.data.basis_openmx import spin_set, PAO_dict, PBE_dict
+from edengnn.data.io.openmx.basis import spin_set, PAO_dict, PBE_dict
+from edengnn.data.io.utils import BOHR
+from pymatgen.core import Element
 
-BOHR = 0.5291772109
+nelec_dict = np.zeros((119))
+for sym, spin in spin_set.items():
+    z = Element(sym).Z
+    nelec_dict[z] = spin[0] + spin[1]
+
+
 BOHR3 = BOHR**3
 
 
@@ -70,9 +77,6 @@ class IO_OpenMX:
                 )
                 # set the real space grid
                 n1, n2, n3 = _set_grid((structure.lattice.matrix) / BOHR, self.encut)
-                n1 = 72
-                n2 = 72
-                n3 = 72
                 dat += self.write_dat(structure, name, n1, n2, n3)
                 dat += self.write_kpath(
                     structure, sp_res["point_coords"], sp_res["path"]
@@ -86,8 +90,7 @@ class IO_OpenMX:
             with open(os.path.join(path_save, f"{name}.dat"), "w") as f:
                 f.write(dat)
 
-            density = np.zeros((n1, n2, n3), dtype=np.float64)
-            density_in = np.zeros((n1, n2, n3), dtype=np.float64)
+            density = None
         else:
             structure = Structure.from_file(os.path.join(path, f"{name}.cif"))
             # ------------------------------------------------------------------
@@ -99,20 +102,6 @@ class IO_OpenMX:
                 line = f.readline().split()
                 num_proc, n1, n2, n3, spin = map(int, line)
             # ------------------------------------------------------------------
-            # read the superposition of atomic charge density from adrst files
-            # ------------------------------------------------------------------
-            files = [
-                os.path.join(path, f"{name}_rst", f"{name}.adrst{i}")
-                for i in range(num_proc)
-            ]
-            rho_list = []
-            for fname in files:
-                data = np.fromfile(fname, dtype=np.float64)
-                rho_list.append(data)
-            density_in = (np.concatenate(rho_list)).reshape(
-                (n1, n2, n3), order="C"
-            ) * 2.0
-            # ------------------------------------------------------------------
             # read the difference charge density from crst files
             # ------------------------------------------------------------------
             files = [
@@ -123,8 +112,16 @@ class IO_OpenMX:
             for fname in files:
                 data = np.fromfile(fname, dtype=np.float64)
                 rho_list.append(data)
-            density = (np.concatenate(rho_list)).reshape((n1, n2, n3), order="C")
-        return name, structure, density_in / BOHR3, (density_in + density) / BOHR3
+            density = (np.concatenate(rho_list)).reshape(
+                (n1, n2, n3), order="C"
+            ) / BOHR3
+
+        z = structure.atomic_numbers
+        pos = structure.cart_coords
+        cell = structure.lattice.matrix
+        nelec = nelec_dict[structure.atomic_numbers].sum(axis=0)
+        volume = np.linalg.det(cell)
+        return name, cell, z, pos, density, (n1, n2, n3), nelec, volume
 
     def write_density(
         self,

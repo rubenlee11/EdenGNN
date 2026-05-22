@@ -19,7 +19,7 @@ import pathlib, argparse, multiprocessing
 
 KAPPA = 900
 
-from edengnn.data.basis_vasp import pseudo_map
+from edengnn.data.io.vasp.basis import pseudo_map
 
 
 def _vasp_scf(structure, dir_work, cfg):

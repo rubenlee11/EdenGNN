@@ -20,7 +20,7 @@ import pathlib, argparse, json, glob, multiprocessing, shutil
 KAPPA = 900
 DK_BAND = 0.037
 
-from edengnn.data.basis_vasp import pseudo_map
+from edengnn.data.io.vasp.basis import pseudo_map
 
 
 def _vasp_nscf(structure, chgcar, dir_work, cfg):

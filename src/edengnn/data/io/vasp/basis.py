@@ -408,3 +408,10 @@ pseudo_map = {
     93: "Np",
     94: "Pu",
 }
+
+nelec_dict = {
+    "Ac": 11,
+    "Ag": 11,
+    "Al": 3,
+    "Ar": 8,
+}
