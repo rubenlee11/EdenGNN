@@ -1,4 +1,5 @@
 import torch, e3nn
+from torch.utils.checkpoint import checkpoint
 
 from .utils.layers import CosineCutoff, BesselBasis
 from .nequip.data import AtomicDataDict
@@ -12,7 +13,7 @@ from .nequip.nn import (
     ConvNetLayer,
 )
 from .nequip.nn.nonlinearities import ShiftedSoftPlus
-from edengnn.data.basis_vasp import AUG_IRREPS
+from edengnn.data.io.vasp.basis import AUG_IRREPS
 
 
 class DensityLayer(torch.nn.Module):
@@ -36,7 +37,8 @@ class DensityLayer(torch.nn.Module):
         num_radial_filter_layers=2,
         num_radial_filter_neurons=64,
         spin=False,
-        chunk_size=20000000,
+        chunk_size_train=20000000,
+        chunk_size_predict=40000000,
     ):
         super().__init__()
 
@@ -45,7 +47,8 @@ class DensityLayer(torch.nn.Module):
         self.l_max = l_max
         self.n_channels = n_channels
         self.dtype = torch.get_default_dtype()
-        self.chunk_size = chunk_size
+        self.chunk_size_train = chunk_size_train
+        self.chunk_size_predict = chunk_size_predict
 
         irreps_probe_features = e3nn.o3.Irreps(
             [
@@ -122,6 +125,23 @@ class DensityLayer(torch.nn.Module):
         out_shape = shape[:-1] + (self.n_channels, self.reshape_index.shape[1])
         return out.reshape(out_shape)
 
+    def compute_chunk(self, pe_c, pl_c, z_c, h_c):
+        len_c = pe_c.shape[0]
+        n_probe = pe_c.shape[1]
+
+        Y_lm_c = self.spharm_edges_probe(pe_c)
+        radial_embedding_c = torch.cat((self.radial_basis_probe(pl_c), z_c), dim=-1)
+        radial_filters_c = self.edge_net(radial_embedding_c).reshape(
+            len_c, n_probe, self.n_channels, self.l_max + 1
+        )
+
+        p_c = torch.einsum(
+            "ipl,ipl->ip",
+            (h_c[:, None, :, :] * radial_filters_c[..., self.l_index]).sum(dim=-2),
+            Y_lm_c,
+        )
+        return p_c
+
     def forward(self, data, batch=None):
         """---------------------------------------------------------------------
 
@@ -135,11 +155,11 @@ class DensityLayer(torch.nn.Module):
 
             h: [n_atom][dim_probe_irreps]
 
-            Y: [n_atom][n_probe][lm_dim]
+            Y_lm: [n_atom * n_probe][lm_dim]
 
             radial_embedding: [n_atom][n_probe][n_radial_basis]
 
-            radial_filters: [n_atom][n_probe][n_channels * (l_max + 1)]
+            radial_filters: [n_atom][n_probe][n_channels][l_max + 1]
 
             probe_feature: [n_atom][n_probe]
 
@@ -176,7 +196,11 @@ class DensityLayer(torch.nn.Module):
         # ----------------------------------------------------------------------
         # apply spherical harmonics expansion
         # ----------------------------------------------------------------------
-        if data["npb_total"] <= self.chunk_size:
+        if self.training:
+            chunk_size = self.chunk_size_train
+        else:
+            chunk_size = self.chunk_size_predict
+        if data["npb_total"] <= chunk_size:
             Y_lm = self.spharm_edges_probe(probe_edge)
             # probe radial filters
             radial_embedding = torch.cat(
@@ -192,33 +216,31 @@ class DensityLayer(torch.nn.Module):
                 Y_lm,
             )
         else:
-            atom_chunk_size = max(1, self.chunk_size // n_probe)
+            atom_chunk_size = max(1, chunk_size // n_probe)
             chunks = []
+
             for start in range(0, n_atom, atom_chunk_size):
                 end = min(start + atom_chunk_size, n_atom)
 
-                Y_lm_chunk = self.spharm_edges_probe(probe_edge[start:end])
+                pe_chunk = probe_edge[start:end]
+                pl_chunk = probe_length[start:end]
+                z_chunk = z_embedding[start:end]
+                h_chunk = h_clm[start:end]
 
-                radial_embedding_chunk = torch.cat(
-                    (
-                        self.radial_basis_probe(probe_length[start:end]),
-                        z_embedding[start:end],
-                    ),
-                    dim=-1,
-                )
+                if self.training:
+                    p_chunk = checkpoint(
+                        self.compute_chunk,
+                        pe_chunk,
+                        pl_chunk,
+                        z_chunk,
+                        h_chunk,
+                        use_reentrant=False,
+                    )
+                else:
+                    p_chunk = self.compute_chunk(pe_chunk, pl_chunk, z_chunk, h_chunk)
 
-                radial_filters_chunk = self.edge_net(radial_embedding_chunk).reshape(
-                    end - start, n_probe, self.n_channels, self.l_max + 1
-                )
-                p_chunk = torch.einsum(
-                    "ipl,ipl->ip",
-                    (
-                        h_clm[start:end, None, :, :]
-                        * radial_filters_chunk[..., self.l_index]
-                    ).sum(dim=-2),
-                    Y_lm_chunk,
-                )
                 chunks.append(p_chunk)
+
             p = torch.cat(chunks, dim=0)
 
         # ----------------------------------------------------------------------
@@ -394,7 +416,8 @@ class EfficientDensity(torch.nn.Module):
             "num_radial_filter_layers": config.probe.conv.num_radial_filter_layers,
             "num_radial_filter_neurons": config.probe.conv.num_radial_filter_neurons,
             "spin": False,
-            "chunk_size": config.probe.chunk_size,
+            "chunk_size_train": config.chunk_size_train,
+            "chunk_size_predict": config.chunk_size_predict,
         }
         self.probe = DensityLayer(**probe_params)
         self.aug = AugmentationLayer(

@@ -8,7 +8,7 @@ n_point = n_atom * grid_per_atom
 Usage:
 python /root/research/e3super-resolution/EdenGNN_git/scripts/tools/test_oom.py \
     --radius 4.0 \
-    --encut 100 \
+    --encut 400 \
     --mode "pw" \
     --filelist "/root/dataset/universal_abacus/mc3d/cifs_debug.txt" \
     --path_out "/root/dataset/universal_abacus/mc3d/npb.json" \
@@ -29,8 +29,6 @@ import os, json, multiprocessing, pathlib, argparse
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 from edengnn.data.io_openmx import _set_grid, _round_for_fft
-
-# from edengnn.data.dataload import get_mask_r
 
 BOHR = 0.5291772109
 DL = 0.15 * BOHR
@@ -90,10 +88,10 @@ def get_npoint(structure, mode, encut, radius):
     if mode == "lcao":
         n1, n2, n3 = _set_grid(cell, encut)
     elif mode == "pw":
-        # n1, n2, n3 = set_grid_fft(cell, encut)
-        n1 = a / DL
-        n2 = b / DL
-        n3 = c / DL
+        n1, n2, n3 = set_grid_fft(cell, encut)
+        # n1 = a / DL
+        # n2 = b / DL
+        # n3 = c / DL
 
     z = structure.atomic_numbers
     npb = len(z) * 4.0 * np.pi / 3.0 * radius**3 * n1 * n2 * n3 / omega

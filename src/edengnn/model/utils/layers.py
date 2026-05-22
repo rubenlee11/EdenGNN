@@ -42,17 +42,11 @@ class CosineCutoff(nn.Module):
 
 class BesselBasis(nn.Module):
     """
-    Sine for radial basis expansion with coulomb decay. (0th order Bessel from DimeNet)
+    Modified 0th order Bessel basis expansion supporting r = 0.
     """
 
     def __init__(self, cutoff=5.0, n_rbf: int = None, cutoff_func: callable = None):
-        """
-        Args:
-            cutoff: radial cutoff
-            n_rbf: number of basis functions.
-        """
         super(BesselBasis, self).__init__()
-        # compute offset and width of Gaussian functions
         freqs = torch.arange(1, n_rbf + 1) * math.pi / cutoff
         self.register_buffer("freqs", freqs)
         self.cutoff_func = cutoff_func
@@ -70,8 +64,12 @@ class BesselBasis(nn.Module):
                 with (N_edge, n_rbf) shape.
         """
         a = self.freqs[None, :]
-        ax = dist.unsqueeze(-1) * a
-        rbf = torch.sin(ax) / dist.unsqueeze(-1)
+
+        # torch.sinc(x) computes sin(pi * x) / (pi * x)
+        # To compute sin(a * dist) / dist, we use a * sinc(a * dist / pi)
+        x = dist.unsqueeze(-1) * a / math.pi
+        rbf = torch.sinc(x) * a
+
         if self.cutoff_func is not None:
             rbf = rbf * self.cutoff_func(dist.unsqueeze(-1))
         return rbf

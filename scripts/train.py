@@ -10,8 +10,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from edengnn.data.dataload import get_loader
-from edengnn.data.io_vasp import IO_VASP
-from edengnn.data.io_openmx import IO_OpenMX
 from edengnn.model.model import EfficientDensity
 
 colors = plt.cm.tab10.colors
@@ -19,9 +17,6 @@ colors = plt.cm.tab10.colors
 
 class Model(L.LightningModule):
     """-------------------------------------------------------------------------
-
-    I mask the augmentation occupancy after model output, because it is more
-    convenient to recover chgcar format with irreps form than with compact form.
 
     -------------------------------------------------------------------------"""
 
@@ -68,6 +63,10 @@ class Model(L.LightningModule):
         return self.model(batch)
 
     def training_step(self, batch, batch_idx):
+        """
+        I mask the augmentation occupancy after model output, because it is more
+        convenient to recover chgcar format with irreps form than with compact form.
+        """
         output = self(batch)
 
         loss = 0
@@ -121,8 +120,10 @@ class Model(L.LightningModule):
         losses = {}
         for key, value in output.items():
             if key == "grid_func_out":
-                losses[key] = torch.sum(torch.abs(batch[key] - value)) / torch.sum(
-                    batch[key]
+                losses[key] = (
+                    torch.sum(torch.abs(batch[key] - value))
+                    / batch["nelec"][0]
+                    * batch["dvolume"][0]
                 )
             elif key == "aug_tensor":
                 aug_tar = batch[key].flatten()[batch["aug_mask"]]
@@ -138,9 +139,9 @@ class Model(L.LightningModule):
 
         info_log = f"[Validation] Epoch {self.current_epoch + 1}, "
         loss = 0
-        for key, value in losses.items():
-            info_log += f"{key} Loss: {value},"
-            loss += losses[key] * self.loss_dict[key]["weight_val"]
+        for k, v in losses.items():
+            info_log += f"{k} Loss: {v.item():.5f},"
+            loss += losses[k] * self.loss_dict[k]["weight_val"]
         self.log(
             "val/loss",
             loss,
@@ -174,7 +175,7 @@ class Model(L.LightningModule):
             if k.startswith("val"):
                 value = v.item()
                 wandb_dict[k] = value
-                info_log += f"{k}: {value},"
+                info_log += f"{k}: {value:.5f},"
 
         self.wandb_run.log(wandb_dict)
         self.logger_.info(info_log)
@@ -197,66 +198,6 @@ class Model(L.LightningModule):
                     )
                 )
         torch.cuda.empty_cache()
-
-    def test_step(self, batch, batch_idx):
-        output = self(batch)
-        losses = {}
-        for key, value in output.items():
-            if key == "grid_func_out":
-                losses[key] = torch.sum(torch.abs(batch[key] - value)) / torch.sum(
-                    batch[key]
-                )
-            elif key == "aug_tensor":
-                aug_tar = batch[key].flatten()[batch["aug_mask"]]
-                aug_pre = value.flatten()[batch["aug_mask"]]
-                losses[key] = self.loss_fn["L1"](aug_tar, aug_pre)
-                self.targets_aug.append(aug_tar.detach().cpu())
-                self.preds_aug.append(aug_pre.detach().cpu())
-            elif key == "total_charge":
-                losses[key] = (
-                    self.loss_fn["L1"](value, batch["grid_func_out"].mean())
-                    * batch["volume"]
-                )
-
-        info_log = f"[Test] {batch["name"]}, "
-        loss = 0
-        for key, value in losses.items():
-            info_log += f"{key} Loss: {value},"
-            loss += losses[key] * self.loss_dict[key]["weight_val"]
-        self.log(
-            "test/loss",
-            loss,
-            on_epoch=True,
-            prog_bar=False,
-            batch_size=batch.ptr.size(0) - 1,
-            sync_dist=True,
-        )
-
-        self.log_dict(
-            {f"test/{k}_loss": v.detach() for k, v in losses.items()},
-            on_epoch=True,
-            prog_bar=False,
-            batch_size=batch.ptr.size(0) - 1,
-            sync_dist=True,
-        )
-        self.logger_.info(info_log)
-
-    def on_test_end(self):
-        test_metrics = self.trainer.callback_metrics
-
-        info_log = f"[Test End], "
-        wandb_dict = {
-            "time": time.time(),
-        }
-        for k, v in test_metrics.items():
-            if k.startswith("test"):
-                value = v.item()
-                wandb_dict[k] = value
-                info_log += f"{k}: {value},"
-
-        self.wandb_run.log(wandb_dict)
-        self.logger_.info(info_log)
-        self._plot_aug()
 
     def predict_step(self, batch, batch_idx):
         output = self(batch)
@@ -429,17 +370,21 @@ def main():
     )
 
     if cfg.data.dft_software == "openmx":
+        from edengnn.data.io.openmx.parse_density import IO_OpenMX
+
         io_dft = IO_OpenMX(
             stage=cfg.run.mode,
             save_dir=save_dir,
             path_template=cfg.data.openmx.path_template,
             encut=cfg.data.openmx.encut,
             num_proc=cfg.data.openmx.num_proc,
-            dk_bz=cfg.data.openmx.dk_bz,
-            dk_band=cfg.data.openmx.dk_band,
-            plot_band=cfg.data.openmx.plot_band,
+            dk_bz=cfg.data.dk_bz,
+            dk_band=cfg.data.dk_band,
+            plot_band=cfg.data.plot_band,
         )
-    else:
+    elif cfg.data.dft_software == "vasp":
+        from edengnn.data.io.vasp.parse_density import IO_VASP
+
         io_dft = IO_VASP(
             stage=cfg.run.mode,
             save_dir=save_dir,
@@ -448,9 +393,22 @@ def main():
             path_template=cfg.data.vasp.path_template,
             encut=cfg.data.vasp.encut,
             lmix_max=cfg.data.vasp.lmix_max,
-            dk_bz=cfg.data.vasp.dk_bz,
-            dk_band=cfg.data.vasp.dk_band,
-            plot_band=cfg.data.vasp.plot_band,
+            dk_bz=cfg.data.dk_bz,
+            dk_band=cfg.data.dk_band,
+            plot_band=cfg.data.plot_band,
+        )
+    elif cfg.data.dft_software == "abacus":
+        from edengnn.data.io.abacus.parse_density import IO_Abacus
+
+        io_dft = IO_Abacus(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            prefix=cfg.data.abacus.prefix,
+            path_template=cfg.data.abacus.path_template,
+            ecutwfc=cfg.data.abacus.ecutwfc,
+            dk_bz=cfg.data.dk_bz,
+            dk_band=cfg.data.dk_band,
+            plot_band=cfg.data.plot_band,
         )
 
     if cfg.run.mode == "train":
@@ -535,8 +493,6 @@ def main():
                     num_atom_total += struct["nat"]
                     num_pb_total += struct["npb"]
 
-                with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
-                    pool.starmap(io_dft.write_density, tasks)
             elif cfg.data.dft_software == "openmx":
                 for struct in predictions:
                     task_args = (
@@ -547,9 +503,21 @@ def main():
                     num_atom_total += struct["nat"]
                     num_pb_total += struct["npb"]
 
-                with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
-                    pool.starmap(io_dft.write_density, tasks)
+            elif cfg.data.dft_software == "abacus":
+                for struct in predictions:
+                    task_args = (
+                        struct["name"],
+                        struct["z"],
+                        struct["cell"],
+                        struct["pos"],
+                        struct["density"],
+                    )
+                    tasks.append(task_args)
+                    num_atom_total += struct["nat"]
+                    num_pb_total += struct["npb"]
 
+            with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
+                pool.starmap(io_dft.write_density, tasks)
             num_atom_total = num_atom_total[0]
             num_pb_total = num_pb_total[0]
             t_write_total = time.time() - t_write_start

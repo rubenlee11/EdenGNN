@@ -17,7 +17,7 @@ from omegaconf import OmegaConf
 from pymatgen.core import Structure
 from pymatgen.io.vasp.inputs import Incar, Poscar, Potcar, Kpoints
 from pymatgen.core import Structure, Lattice
-from edengnn.data.basis_vasp import pseudo_map
+from edengnn.data.io.vasp.basis import pseudo_map
 
 CELL_ILL_CONDITION = 0.15
 DK_BAND = 0.037

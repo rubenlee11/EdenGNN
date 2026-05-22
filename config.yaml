@@ -5,10 +5,10 @@ run:
   mode: train # Options: "train", "test", "predict"
   task: 2 # 0: density; 1: augmentation; 2: density & augmentation 
   project: edengnn
-  name: mp
-  save_dir: /root/research/e3super-resolution/result
+  name: mc3d
+  save_dir: /root/dataset/molecular_dynamics/gan
   log: offline
-  checkpoint:
+  checkpoint: 
   resume: False # True only when restarting an interupted training
   dtype: float32
 
@@ -16,21 +16,22 @@ data:
   dft_software: "vasp"
   openmx:
     # For the generatation of input files in the predicting stage
-    path_template: /root/research/e3super-resolution/EdenGNN_git/scripts/openmx/template.dat
+    path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/openmx/template.dat
     encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
     num_proc: 64 # number of cpus used for restart calculations
-    dk_bz: 0.35 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk 
-    dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
-    plot_band: True
   vasp:
     lmix_max: 6
     # for prediction
-    path_template: /root/research/e3super-resolution/EdenGNN_git/scripts/vasp/template.incar
-    path_pp: /root/research/e3super-resolution/EdenGNN_git/scripts/vasp/pp
+    path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/template.incar
+    path_pp: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/pp
     encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
-    dk_bz: 0.35 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk 
-    dk_band: 0.038 # the sampling density along high symmetry lines for plotting band structures.
-    plot_band: True
+  abacus:
+    prefix: aiida
+    path_template: 
+    ecutwfc: 100 # control the density grid
+  dk_bz: 0.15 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
+  dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
+  plot_band: False # if true, use primitive cell   
   # ----------------------------------------------------------------------------
   # Dataset Loading Modes:
   # 1. In-Memory Mode (graphdata: True): Loads a pre-processed monolithic .npz 
@@ -39,14 +40,14 @@ data:
   #    Reads and parses individual CHGCAR or binary files from the disk on demand 
   #    during the training loop, based on the provided split lists.
   # ----------------------------------------------------------------------------
-  dir: /root/dataset/mp_nonmag/vasp_run # directory of scf calculations
-  path_train: /root/dataset/debug/dataset.txt # sad paths
-  path_val: /root/dataset/debug/dataset.txt
+  dir: /root/dataset/molecular_dynamics/gan/vasp_run_md # directory of scf calculations
+  path_train: /root/dataset/molecular_dynamics/gan/dataset_debug.txt # sad paths
+  path_val: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
   path_test: 
   # ----------------------------------------------------------------------------
   # txt files storing the input SAD CHGCAR paths for inference
   # ----------------------------------------------------------------------------  
-  path_predict: /root/dataset/molecular_dynamics/lif/dataset_openmx.txt
+  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
   # ----------------------------------------------------------------------------
   # Currently EdenGNN only supports batch size = 1 to avoid OOM. Using batch > 1 
   # will cause serious errors. I have tried batch > 1 with 1D arrays, and found 
@@ -55,7 +56,7 @@ data:
   num_workers: 4 # strongly recommend to set this larger than 1 when using Lazy Loading
   use_bin: False # True if using binary pseudo charge density data
   batch_size: 1 
-  graphdata: False #   
+  graphdata: False
 
 optimize:
   loss_dict:
@@ -100,7 +101,9 @@ optimize:
 model:
   task: ${run.task}
   lmix_max: ${data.vasp.lmix_max}
-  use_sad: True # whether or not enable training the difference charge density
+  use_sad: False # whether or not output total charge density. if False, only output difference charge density
+  chunk_size_train: 1000000 # Maximum number of probe points per training step (depends on your GPU memory)
+  chunk_size_predict: 1000000 # Maximum number of probe points per prediction step (depends on your GPU memory) 
   atom:
     l_max: 6
     num_types: 100
@@ -126,7 +129,6 @@ model:
       num_radial_filter_neurons: 20
       num_radial_filter_layers: 2
       n_channels: 4 # the number of radial basis for each angular quantum number.
-    chunk_size: 4000000 # Max probe points per prediction step (limited by GPU memory)
 
 wandb:
   project: ${run.project}
