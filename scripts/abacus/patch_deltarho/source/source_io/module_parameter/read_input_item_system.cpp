@@ -447,7 +447,8 @@ Available options are:
                 // dm and hr are valid options for nscf calculation (e.g., band structure, wannier90)
                 if (para.input.init_chg != "file" && 
                     para.input.init_chg != "dm" && 
-                    para.input.init_chg != "hr")
+                    para.input.init_chg != "hr" &&
+                    para.input.init_chg != "drho")
                 {
                     ModuleBase::GlobalFunc::AUTO_SET("init_chg", para.input.init_chg);
                     para.input.init_chg = "file";

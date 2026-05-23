@@ -91,20 +91,6 @@ def plot_parity(pre, tar, save_path, mae=None, label=None):
         rasterized=True,
     )
 
-    """
-    axins = inset_axes(
-        ax,
-        width="30%",
-        height="30%",
-        loc="lower left",
-        bbox_to_anchor=(0.6, 0.1, 1, 1),
-        bbox_transform=ax.transAxes,
-    )
-    axins.hist(err, bins=50, density=True, color=colors[0])
-    axins.set_title("Error", fontsize=8)
-    axins.tick_params(labelsize=7)
-    """
-
     # set label
     if label is not None:
         ax.set_xlabel(xlabel_dict[label])

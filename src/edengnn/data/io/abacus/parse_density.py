@@ -50,6 +50,7 @@ class IO_Abacus:
 
     def read_data(self, path):
         name = pathlib.Path(path).stem
+        os.makedirs(os.path.join(self.save_dir, name), exist_ok=True)
         if self.stage == "train":
             z, charges, cell, pos, density = _read_cube(
                 os.path.join(path, f"OUT.{self.prefix}", "chgdelta.cube")
@@ -74,8 +75,21 @@ class IO_Abacus:
                     coords=sp_res["primitive_positions"],
                     coords_are_cartesian=False,
                 )
+                self.write_kpt_line(
+                    os.path.join(self.save_dir, name, "KPT_BAND"),
+                    structure,
+                    sp_res["point_coords"],
+                    sp_res["path"],
+                )
             else:
                 structure = structure_
+            # write kpt
+            r_cell = structure.lattice.reciprocal_lattice.matrix
+            k_grid = np.maximum(
+                np.round(np.linalg.norm(r_cell, axis=1) / self.dk_bz), 1
+            ).astype(int)
+            self.write_input(name, structure, k_grid)
+
             n1, n2, n3 = set_grid_fft(
                 structure.lattice.matrix, 4.0 * self.ecutwfc / (np.pi * 2) ** 2
             )
@@ -84,8 +98,6 @@ class IO_Abacus:
             cell = structure.lattice.matrix
             density = None
             nelec = 0.0
-
-            self.write_input(name, structure)
 
         volume = np.linalg.det(cell)
         return name, cell, z, pos, density, (n1, n2, n3), nelec, volume
@@ -97,26 +109,12 @@ class IO_Abacus:
         path = os.path.join(dir_out, f"SPIN1_CHG.cube")
         _write_cube(path, z, np.zeros(len(z)), cell, pos, density)
 
-    def write_input(self, name, structure):
+    def write_input(self, name, structure, k_grid):
         """
         generate input files
         """
 
-        r_cell = structure.lattice.reciprocal_lattice.matrix
-
-        # automatic specify uniform K grid with fixed sampling density
-        Nka = np.round(np.sqrt(np.inner(r_cell[0], r_cell[0])) / self.dk_bz)
-        if Nka < 1:
-            Nka = 1
-        Nkb = np.round(np.sqrt(np.inner(r_cell[1], r_cell[1])) / self.dk_bz)
-        if Nkb < 1:
-            Nkb = 1
-        Nkc = np.round(np.sqrt(np.inner(r_cell[2], r_cell[2])) / self.dk_bz)
-        if Nkc < 1:
-            Nkc = 1
-
         dir_work = os.path.join(self.save_dir, name)
-        # os.makedirs(dir_work, exist_ok=True)
         atoms = AseAtomsAdaptor.get_atoms(structure)
         profile = AbacusProfile(command="abacus")
 
@@ -130,25 +128,71 @@ class IO_Abacus:
                 directory=dir_work,
                 pp=pp,
                 basis=basis,
-                calculation="scf",
+                calculation="nscf",
                 basis_type="lcao",
                 out_chg=-1,
-                scf_nmax=1,
                 init_chg="drho",
+                scf_thr=1e-6,
                 smearing_method="gaussian",
                 smearing_sigma=0.015,
                 ecutwfc=self.ecutwfc,
-                kpts=[int(Nka), int(Nkb), int(Nkc)],
                 suffix=self.prefix,
                 out_band=1,
+                kpts=k_grid,
             )
             atoms.calc = calc
             calc.write_inputfiles(
                 atoms,
                 properties=["energy"],
             )
+            # write KPT file
         except:
             print(f"Could not find pseudo or basis files for {name}")
+
+    def write_kpt_line(self, path, structure, point_coords, k_path):
+        kpts_lines = []
+        kpt_labels = []
+        r_cell = structure.lattice.reciprocal_lattice.matrix
+        for i, (start_label, end_label) in enumerate(k_path):
+            k1_frac = np.array(point_coords[start_label])
+            k2_frac = np.array(point_coords[end_label])
+
+            # Calculate distance in reciprocal space
+            k1_cart = np.dot(k1_frac, r_cell)
+            k2_cart = np.dot(k2_frac, r_cell)
+            dist = np.linalg.norm(k2_cart - k1_cart)
+
+            # Determine number of points for this segment
+            npts = max(2, int(np.ceil(dist / self.dk_band)))
+
+            if i == 0:
+                kpts_lines.append(
+                    [k1_frac[0], k1_frac[1], k1_frac[2], npts, start_label]
+                )
+                kpt_labels.append(start_label)
+            else:
+                prev_end_label = k_path[i - 1][1]
+                if start_label != prev_end_label:
+                    # Handle path jump: set npts of the previous point to 0
+                    kpts_lines[-1][3] = 0
+                    kpts_lines.append(
+                        [k1_frac[0], k1_frac[1], k1_frac[2], npts, start_label]
+                    )
+                    kpt_labels.append(start_label)
+
+            kpts_lines.append([k2_frac[0], k2_frac[1], k2_frac[2], npts, end_label])
+            kpt_labels.append(end_label)
+
+        # The last k-point in ABACUS Line mode should have npts=1
+        kpts_lines[-1][3] = 1
+        with open(path, "w") as f:
+            f.write("K_POINTS\n")
+            f.write(f"{len(kpts_lines)}\n")
+            f.write("Line\n")
+            for kpt in kpts_lines:
+                f.write(
+                    f"{kpt[0]:.6f} {kpt[1]:.6f} {kpt[2]:.6f} {kpt[3]} // {kpt[4]}\n"
+                )
 
 
 def _read_cube(filename):
