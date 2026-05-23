@@ -2,36 +2,37 @@ run:
   seed: 42
   device: cuda:0
   num_gpus: 1
-  mode: train # Options: "train", "test", "predict"
-  task: 2 # 0: density; 1: augmentation; 2: density & augmentation 
+  mode: predict # Options: "train", "test", "predict"
+  task: 0 # 0: density; 1: augmentation; 2: density & augmentation 
   project: edengnn
   name: mc3d
-  save_dir: /root/dataset/molecular_dynamics/gan
+  save_dir: /root/dataset/universal_abacus
   log: offline
-  checkpoint: 
+  checkpoint: /root/dataset/universal_abacus/edengnn/2026-05-15-18-49-10/best_step=535080.ckpt
   resume: False # True only when restarting an interupted training
   dtype: float32
 
 data:
-  dft_software: "vasp"
+  dft_software: "abacus"
   openmx:
     # For the generatation of input files in the predicting stage
     path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/openmx/template.dat
-    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
+    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX.
     num_proc: 64 # number of cpus used for restart calculations
   vasp:
     lmix_max: 6
     # for prediction
     path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/template.incar
     path_pp: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/pp
-    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX
+    encut: 220 # eV
+    dir: /root/dataset/molecular_dynamics/gan/vasp_run_md # directory of scf calculations.     
   abacus:
     prefix: aiida
     path_template: 
-    ecutwfc: 100 # control the density grid
+    ecutwfc: 100 # Rydberg
   dk_bz: 0.15 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
   dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
-  plot_band: False # if true, use primitive cell   
+  plot_band: True # used in the inference stage. If true, convert to primitive cell   
   # ----------------------------------------------------------------------------
   # Dataset Loading Modes:
   # 1. In-Memory Mode (graphdata: True): Loads a pre-processed monolithic .npz 
@@ -40,33 +41,32 @@ data:
   #    Reads and parses individual CHGCAR or binary files from the disk on demand 
   #    during the training loop, based on the provided split lists.
   # ----------------------------------------------------------------------------
-  dir: /root/dataset/molecular_dynamics/gan/vasp_run_md # directory of scf calculations
   path_train: /root/dataset/molecular_dynamics/gan/dataset_debug.txt # sad paths
   path_val: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
   path_test: 
   # ----------------------------------------------------------------------------
   # txt files storing the input SAD CHGCAR paths for inference
   # ----------------------------------------------------------------------------  
-  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+  path_predict: /root/dataset/universal_abacus/mc3d/cifs_debug.txt
   # ----------------------------------------------------------------------------
   # Currently EdenGNN only supports batch size = 1 to avoid OOM. Using batch > 1 
   # will cause serious errors. I have tried batch > 1 with 1D arrays, and found 
   # that it is not efficient for training.
   # ----------------------------------------------------------------------------
-  num_workers: 4 # strongly recommend to set this larger than 1 when using Lazy Loading
+  num_workers: 4 # 
   use_bin: False # True if using binary pseudo charge density data
   batch_size: 1 
-  graphdata: False
+  #graphdata: False
 
 optimize:
   loss_dict:
     grid_func_out: 
-      weight_train: 0.9
-      weight_val: 0.9
+      weight_train: 1.
+      weight_val: 1.
       loss: "L1"
     aug_tensor: 
-      weight_train: 0.1
-      weight_val: 0.1
+      weight_train: 0.
+      weight_val: 0.
       loss: "L1"
     total_charge:
       weight_train: 0.0
@@ -123,7 +123,7 @@ model:
       n_z_embedding_dim: 8
       n_z_embedding_neurons: 20
       n_z_embedding_layers: 2      
-      cutoff: 4.0 # the radius which determines the neighbor grids for atoms.
+      cutoff: 3.0 # the radius which determines the neighbor grids for atoms.
       regularization: False
     conv: 
       num_radial_filter_neurons: 20

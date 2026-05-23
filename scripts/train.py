@@ -388,7 +388,7 @@ def main():
         io_dft = IO_VASP(
             stage=cfg.run.mode,
             save_dir=save_dir,
-            dir=cfg.data.dir,
+            dir=cfg.data.vasp.dir,
             use_bin=cfg.data.use_bin,
             path_template=cfg.data.vasp.path_template,
             encut=cfg.data.vasp.encut,

@@ -74,7 +74,6 @@ Run **VASP** to obtain the Superposition of Atomic Charge Density (SACD). This s
 
 Perform normal self-consistent DFT calculations to generate the ground truth data.
 - **Consistency is Key:** When using **VASP** to label data, ensure the precision settings match those used in the SACD calculations (except for `KPOINTS` and `ISMEAR`). Inconsistent grids between pseudo charge densities will raise errors.
-- **Precision Recommendation:** For an 80 GB GPU, we recommend using the `PREC = Normal` accuracy level for preparing training datasets and making predictions.
 
 #### 3. Create Filelists
 
@@ -164,12 +163,12 @@ python scripts/train.py --config path/to/config.yaml
 
 ## Troubleshooting
 
-If you encounter with out of memory (OOM) warnings when training the pseudo charge density, try the following solutions:
+If you encounter with out of memory (OOM) errors when training or predicting the pseudo charge density, try the following solutions:
 
-1. Use a GPU with larger VRAM.
+1. Decrease the `model.chunk_size_train` variable. This parameter controls the number of radial points processed simultaneously during training.
 2. Decrease the maximum number of grids for structures in your training set.
 3. Reduce the number of channels: `model.probe.conv.n_channels`.
-4. Decrease the `CHUNK_CRITERION` variable in `src/model/model.py`. This parameter controls the number of radial points processed simultaneously during inference.
+4. In VASP, `PREC = Normal` is accurate enough for band structures. `PREC = Accurate` results denser grid and slows down training. 
 
 ## Universal Model
 

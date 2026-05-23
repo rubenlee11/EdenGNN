@@ -93,28 +93,7 @@ class IO_OpenMX:
             density = None
         else:
             structure = Structure.from_file(os.path.join(path, f"{name}.cif"))
-            # ------------------------------------------------------------------
-            # read the real space grid
-            # ------------------------------------------------------------------
-            with open(
-                os.path.join(path, f"{name}_rst", f"{name}.crst_check"), "r"
-            ) as f:
-                line = f.readline().split()
-                num_proc, n1, n2, n3, spin = map(int, line)
-            # ------------------------------------------------------------------
-            # read the difference charge density from crst files
-            # ------------------------------------------------------------------
-            files = [
-                os.path.join(path, f"{name}_rst", f"{name}.crst{spin}_{i}_0")
-                for i in range(num_proc)
-            ]
-            rho_list = []
-            for fname in files:
-                data = np.fromfile(fname, dtype=np.float64)
-                rho_list.append(data)
-            density = (np.concatenate(rho_list)).reshape(
-                (n1, n2, n3), order="C"
-            ) / BOHR3
+            density, n1, n2, n3 = _read_rst(path, name)
 
         z = structure.atomic_numbers
         pos = structure.cart_coords
@@ -138,7 +117,7 @@ class IO_OpenMX:
         os.makedirs(path_rst, exist_ok=True)
 
         grid_shape = density.shape
-        density = (density.reshape(-1, order="C")) * BOHR3
+        density = (density.reshape(-1, order="C")) * BOHR3 / 2.0
         density = np.asarray(density, dtype=np.float64)
         n_grid = density.size
         chunk_size = n_grid // self.num_proc
@@ -258,6 +237,29 @@ class IO_OpenMX:
         lines.append("Band.kpath>")
 
         return "\n".join(lines)
+
+
+def _read_rst(dir, name):
+    # ------------------------------------------------------------------
+    # read the real space grid
+    # ------------------------------------------------------------------
+    with open(os.path.join(dir, f"{name}_rst", f"{name}.crst_check"), "r") as f:
+        line = f.readline().split()
+        num_proc, n1, n2, n3, spin = map(int, line)
+    # ------------------------------------------------------------------
+    # read the difference charge density from crst files
+    # ------------------------------------------------------------------
+    files = [
+        os.path.join(dir, f"{name}_rst", f"{name}.crst{spin}_{i}_0")
+        for i in range(num_proc)
+    ]
+    rho_list = []
+    for fname in files:
+        data = np.fromfile(fname, dtype=np.float64)
+        rho_list.append(data)
+    # the 2.0 factor is due to OpenMX's convention
+    density = (np.concatenate(rho_list)).reshape((n1, n2, n3), order="C") / BOHR3 * 2.0
+    return density, n1, n2, n3
 
 
 def _set_grid(cell, encut=220):

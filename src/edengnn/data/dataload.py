@@ -17,29 +17,25 @@ Create PyTorch dataset and dataloader.
 
 def get_loader(cfg, stage, io_dft):
     path = getattr(cfg.data, f"path_{stage}")
-    if cfg.data.graphdata is True:
-        dataset = GraphDataset(path)
+    if cfg.model.task == 1:
+        dataset = AugDataset(
+            cfg.data.vasp.dir,
+            path,
+            cfg.model.atom.edge.cutoff,
+            cfg.model.probe.edge.cutoff,
+            lmix_max=cfg.model.lmix_max,
+            stage=stage,
+            use_bin=cfg.data.use_bin,
+        )
     else:
-        if cfg.model.task == 1:
-            dataset = AugDataset(
-                cfg.data.dir,
-                path,
-                cfg.model.atom.edge.cutoff,
-                cfg.model.probe.edge.cutoff,
-                lmix_max=cfg.model.lmix_max,
-                stage=stage,
-                use_bin=cfg.data.use_bin,
-            )
-        else:
-            dataset = DensityDataset(
-                cfg.data.dir,
-                path,
-                cfg.model.atom.edge.cutoff,
-                cfg.model.probe.edge.cutoff,
-                io_dft=io_dft,
-                stage=stage,
-                dft_software=cfg.data.dft_software,
-            )
+        dataset = DensityDataset(
+            path,
+            cfg.model.atom.edge.cutoff,
+            cfg.model.probe.edge.cutoff,
+            io_dft=io_dft,
+            stage=stage,
+            dft_software=cfg.data.dft_software,
+        )
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
@@ -149,7 +145,6 @@ class AugDataset(torch.utils.data.Dataset):
 class DensityDataset(torch.utils.data.Dataset):
     def __init__(
         self,
-        dir,
         split,
         cutoff,
         radius,
@@ -164,7 +159,6 @@ class DensityDataset(torch.utils.data.Dataset):
         with open(split, "r") as f:
             self.paths = [line.strip() for line in f]
 
-        self.dir = dir
         self.dft_software = dft_software
         self.stage = stage
         self.dtype = torch.get_default_dtype()
