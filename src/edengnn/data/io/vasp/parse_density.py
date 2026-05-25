@@ -128,6 +128,7 @@ class IO_VASP:
             z,
             pos,
             density,
+            density_sad,
             (n1, n2, n3),
             nelec,
             volume,
