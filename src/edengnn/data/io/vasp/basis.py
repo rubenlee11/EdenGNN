@@ -11,7 +11,7 @@ def init_basic_irreps(basis):
     num_basis = len(basis)
     I1I2_IDX = [
         [0] * num_basis for _ in range(num_basis)
-    ]  # map from basis index to irreps tensor begin position
+    ]  # map from basis index to irreps tensor start position
 
     count = 0
 

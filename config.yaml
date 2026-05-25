@@ -1,84 +1,157 @@
+# ------------------------------------------------------------------------------
+# EdenGNN Configuration Template
+#
+# Convention:
+# Key:   Value                        # [Tag] Description
+#
+#
+# Tags:
+# [set]: Must be set in your first usage.
+# [check]: Must be checked before running.
+# [check train]: Must be checked in the training stage.
+# [check predict]: Must be checked in the predicting stage.
+# [default]: Works well with default values, modify only if necessary.
+# ------------------------------------------------------------------------------
+
 run:
-  seed: 42
-  device: cuda:0
-  num_gpus: 1
-  mode: predict # Options: "train", "test", "predict"
-  task: 0 # 0: density; 1: augmentation; 2: density & augmentation 
-  project: edengnn
-  name: mc3d
-  save_dir: /root/dataset/universal_abacus
+  # [default] Global random number seed
+  seed: 42          
+
+  # [default] Hardware device for computation. Options: "cpu", "cuda:0", etc.
+  device: cuda:0       
+
+  # [default] Number of GPUs to use for distributed training. Experimental usage.
+  num_gpus: 1      
+
+  # [check] "train" or "predict"        
+  mode: predict       
+
+  # [check] Task type. 0: density; 1: augmentation; 2: density & augmentation. Must match ckpt if any.      
+  task: 0          
+
+  # [check] Wandb project     
+  project: edengnn      
+
+  # [check] Name of work, useful if using wandb online mode.
+  name: universal         
+
+  # [check] The final result is stored at: `run.save_dir/run.project/timestamp`.
+  save_dir: your/dir
+
+  # [default] Wandb log mode            
   log: offline
-  checkpoint: /root/dataset/universal_abacus/edengnn/2026-05-15-18-49-10/best_step=535080.ckpt
+
+  # [check] path to ckpt file. used for prediction or restarting training
+  checkpoint:
+
+  # [default]
   resume: False # True only when restarting an interupted training
+
+  # [default]
   dtype: float32
 
 data:
-  dft_software: "abacus"
+  # [check]: 
+  dft_software: "vasp" 
+
   openmx:
-    # For the generatation of input files in the predicting stage
-    path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/openmx/template.dat
-    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX.
-    num_proc: 64 # number of cpus used for restart calculations
+    # [set]:
+    path_template: absolute/path/to/EdenGNN-main/scripts/openmx/template.dat 
+
+    # [default]: Cutoff energy in [Hartree] for specifying the real space grid 
+    # density. See the scf.energycutoff tag in OpenMX.
+    encut: 220 
+
+    # [check predict]: number of cpus used for restart OpenMX calculations
+    num_proc: 64  
+              
   vasp:
-    lmix_max: 6
-    # for prediction
-    path_template: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/template.incar
-    path_pp: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/pp
-    encut: 220 # eV
-    dir: /root/dataset/molecular_dynamics/gan/vasp_run_md # directory of scf calculations.     
+    # [check] Should be consistent with the LMAXMIX tag of your VASP calculations
+    lmix_max: 6 
+
+    # [set]
+    path_template: absolute/path/to/EdenGNN-main/scripts/vasp/template.incar
+
+    # [default] in [eV]. will be used in the future to specify the grid shape
+    encut: 520
+
+    # [check train] Directory of scf calculations which contain sub directories 
+    # the name of which are consistent in data.path_train and data.path_val
+    dir:
+
   abacus:
+    # [check train] Abacus 'suffix' keywords. used for reading the training directories
     prefix: aiida
-    path_template: 
-    ecutwfc: 100 # Rydberg
-  dk_bz: 0.15 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
-  dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
-  plot_band: True # used in the inference stage. If true, convert to primitive cell   
-  # ----------------------------------------------------------------------------
-  # Dataset Loading Modes:
-  # 1. In-Memory Mode (graphdata: True): Loads a pre-processed monolithic .npz 
-  #    archive directly into RAM. (Memory-intensive, suitable for small datasets)
-  # 2. Lazy Loading / On-the-fly Mode (graphdata: False) [RECOMMENDED]: 
-  #    Reads and parses individual CHGCAR or binary files from the disk on demand 
-  #    during the training loop, based on the provided split lists.
-  # ----------------------------------------------------------------------------
-  path_train: /root/dataset/molecular_dynamics/gan/dataset_debug.txt # sad paths
-  path_val: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
-  path_test: 
-  # ----------------------------------------------------------------------------
-  # txt files storing the input SAD CHGCAR paths for inference
-  # ----------------------------------------------------------------------------  
-  path_predict: /root/dataset/universal_abacus/mc3d/cifs_debug.txt
-  # ----------------------------------------------------------------------------
-  # Currently EdenGNN only supports batch size = 1 to avoid OOM. Using batch > 1 
-  # will cause serious errors. I have tried batch > 1 with 1D arrays, and found 
-  # that it is not efficient for training.
-  # ----------------------------------------------------------------------------
-  num_workers: 4 # 
-  use_bin: False # True if using binary pseudo charge density data
-  batch_size: 1 
-  #graphdata: False
+
+    # [set] unused keywords
+    path_template: absolute/path/to/EdenGNN-main/scripts/vasp/template.incar
+
+    # [default] in [Rydberg]. See Abacus manual. 
+    ecutwfc: 100 
+
+  # [check predict] the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
+  dk_bz: 0.15     
+
+  # [check predict] the sampling density along high symmetry lines for plotting band structures.          
+  dk_band: 0.037            
+
+  # [check predict] If true, convert to primitive cell.
+  plot_band: False          
+
+  # [check train]
+  path_train: # sacd paths of working directories
+
+  # [check train]
+  path_val: # sacd paths of working directories
+
+  # [check predict] txt files storing the input SAD CHGCAR paths for inference
+  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+
+  # [default]
+  num_workers: 4
+
+  # [check train] True if run.task = 1
+  use_bin: False 
+
+  # [default] Currently EdenGNN only supports batch size = 1. batch > 1 will 
+  # raise errors.
+  batch_size: 1
 
 optimize:
+  # [check train] loss_train = \sum_i weight_train_i * loss_i
+  # loss_val = \sum_i weight_val_i * loss_i
   loss_dict:
-    grid_func_out: 
-      weight_train: 1.
+    grid_func_out: # charge density
+      weight_train: 1. 
       weight_val: 1.
       loss: "L1"
-    aug_tensor: 
-      weight_train: 0.
+    aug_tensor: # augmentation occupancy
+      weight_train: 0. 
       weight_val: 0.
       loss: "L1"
+    # this is deprecated. total charge errors are logged during training
     total_charge:
       weight_train: 0.0
       weight_val: 0.0
       loss: "L2"
+
+  # [check train]
   lr: 0.005
   task: ${run.task}
+
+  # [default] Freeze the parameters of the MLPs of the RBFs. Experimental usage
   freeze_basis: False
-  log_every_n_steps: 1
-  val_check_interval_steps:  # 
-  accumulate_grad_batches: 1 # default None. 
-  # set scheduler
+
+  # [default] Log step of training loss.
+  log_every_n_steps: 20
+
+  # [default] used for training universal models
+  val_check_interval_steps:
+
+  # [default] Large than 1 means DDP training is on. Experimental usage.
+  accumulate_grad_batches: 1
+
+  # [default] Set scheduler.
   scheduler: 
     type: ReduceLROnPlateau
     ReduceLROnPlateau:
@@ -87,48 +160,97 @@ optimize:
       min_lr: 0.00002
       threshold: 0.00001
   max_epochs: 3000
-  max_steps: 1000000     
-  # set optimizer 
+  max_steps: 1000000 
+
+  # [default] Set optimizer.
   optimizer:
     type: AdamW
     AdamW:
       epsilon: 1e-8
       beta1: 0.99
-      beta2: 0.999   
-  log_level: 0 # 0 default; 1 for debug    
+      beta2: 0.999
+
+  # [default] 0 default; 1 for debug 
+  log_level: 0
+
+  # [default]
   gradient_clip_val: 0.0    
 
 model:
   task: ${run.task}
   lmix_max: ${data.vasp.lmix_max}
-  use_sad: False # whether or not output total charge density. if False, only output difference charge density
-  chunk_size_train: 1000000 # Maximum number of probe points per training step (depends on your GPU memory)
-  chunk_size_predict: 1000000 # Maximum number of probe points per prediction step (depends on your GPU memory) 
+
+  # [check predict] Whether or not predict total charge density. Set True for 
+  # predict VASP CHGCAR. Otherwise set it False.
+  use_sad: False 
+
+  # [check train] Maximum number of probe points per training chunk. Should be
+  # set close to the OOM value to improve speed.
+  # (depends on your GPU, 20,000,000 works for A800 GPU which has 80G VRAM).
+  chunk_size_train: 1000000
+
+  # [check] Maximum number of probe points per prediction chunk.
+  # (depends on your GPU, 20,000,000 works for A800 GPU which has 80G VRAM).
+  chunk_size_predict: 1000000
+
   atom:
+    # [default]
     l_max: 6
+
+    # [default]
     num_types: 100
+
     edge:
+      # [default]
       n_radial_basis: 8
+
+      # [default]
       radial_type: Bessel
-      cutoff: 4.0 # the maximum distance between neighbor atoms
+
+      # [default] The maximum distance between neighbor atoms.
+      cutoff: 4.0
     conv:
+      # [default]
       num_conv_layers: 3
+
+      # [default]
       num_radial_filter_neurons: 64
+
+      # [default]
       num_radial_filter_layers: 2   
+
+      # [default] Irreps of node features in the graph convolutions.
       irreps_node_features: 64x0e+64x0o+20x1o+20x1e+16x2o+16x2e+8x3o+8x3e+6x4o+6x4e+5x5e+5x5o+4x6e+4x6o
   probe:
-    l_max: 6
+    # [default]
+    l_max: 6 
+
     edge:
-      n_radial_basis: 8
-      n_z_embedding_dim: 8
-      n_z_embedding_neurons: 20
-      n_z_embedding_layers: 2      
-      cutoff: 3.0 # the radius which determines the neighbor grids for atoms.
-      regularization: False
+      # [default]: The radius in [Angstrom] which determines the neighbor grids 
+      # for atoms.
+      cutoff: 4.0 
+
+      # [default]
+      n_radial_basis: 8 
+
+      # [default]
+      n_z_embedding_dim: 8 
+
+      # [default]
+      n_z_embedding_neurons: 20 # 
+
+      # [default]
+      n_z_embedding_layers: 2 
+
     conv: 
-      num_radial_filter_neurons: 20
-      num_radial_filter_layers: 2
-      n_channels: 4 # the number of radial basis for each angular quantum number.
+      # [default]
+      num_radial_filter_neurons: 20 
+
+      # [default]
+      num_radial_filter_layers: 2 
+
+      # [default] the number of radial basis for each angular quantum number.
+      n_channels: 4 
 
 wandb:
   project: ${run.project}
