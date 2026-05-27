@@ -194,10 +194,9 @@ class Model(L.LightningModule):
                 self.best_val = current_val
                 self.trainer.save_checkpoint(
                     filepath=os.path.join(
-                        self.save_dir,
-                        f"best_step={self.global_step}.ckpt",
-                        weights_only=True,
-                    )
+                        self.save_dir, f"best_step={self.global_step}.ckpt"
+                    ),
+                    weights_only=True,
                 )
         torch.cuda.empty_cache()
 
