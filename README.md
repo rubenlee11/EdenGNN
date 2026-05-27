@@ -36,10 +36,9 @@ Ensure you have the following dependencies installed in your python environment:
 - `torch`
 - `pytorch-geometric`
 - `e3nn`
-- `nequip`
 - `lightning`
 - `meson`
-- `numpy`
+- `vesin`
 
 ### Install EdenGNN
 
