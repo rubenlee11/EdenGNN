@@ -145,6 +145,9 @@ def parse_band(dir, prefix, ax, color="b"):
 
 
 path_dir = "/public/home/lixiwen/dataset/universal_abacus/mc3d/dataset_test_gnome.txt"
+dir_tar = (
+    "/public/home/lixiwen/dataset/universal_abacus/edengnn/2026-05-23-19-02-35/target"
+)
 with open(path_dir, "r") as f:
     paths = [line.strip() for line in f]
 
@@ -153,12 +156,11 @@ for path in paths:
     plt.title("Electronic Band Structure", fontsize=16)
     plt.tight_layout()
 
-    bands_pre, ef_pre = parse_band(
-        path,
-        "aiida",
-        ax,
-        color="b",
-    )
+    name = pathlib.Path(path).stem
+    bands_pre, ef_pre = parse_band(path, "aiida", ax, color="b")
+    bands_tar, ef_tar = parse_band(os.path.join(dir_tar, name), "aiida", ax, color="r")
+    print(np.mean(np.abs(bands_pre - bands_tar)))
+
     plt.show()
     plt.savefig(os.path.join(path, "band.png"), dpi=300)
     plt.close()

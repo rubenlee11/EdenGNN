@@ -167,6 +167,7 @@ class DensityDataset(torch.utils.data.Dataset):
                 z,
                 pos,
                 density,
+                density_sad,
                 grid_shape,
                 nelec,
                 volume,
@@ -223,6 +224,13 @@ class DensityDataset(torch.utils.data.Dataset):
                 torch.tensor(aug_tensor, dtype=self.dtype)
                 if (self.stage == "train" or self.stage == "val")
                 else None
+            )
+            data["grid_func_in"] = (
+                (
+                    torch.tensor(density_sad, dtype=self.dtype)
+                    if (self.stage == "predict")
+                    else None
+                ),
             )
             data["lmix_max"] = self.io_dft.lmix_max
 
