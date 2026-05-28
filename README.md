@@ -2,6 +2,8 @@
 
 **EdenGNN** (Equivariant Density Graph Neural Network) is an E(3)-equivariant Graph Neural Network framework designed for accurate and efficient prediction of charge density and electronic structures directly from atomic configurations.
 
+You can run the **EdenGNN** examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing).
+
 ---
 
 - [Features](#features)
@@ -34,10 +36,9 @@ Ensure you have the following dependencies installed in your python environment:
 - `torch`
 - `pytorch-geometric`
 - `e3nn`
-- `nequip`
 - `lightning`
 - `meson`
-- `numpy`
+- `vesin`
 
 ### Install EdenGNN
 

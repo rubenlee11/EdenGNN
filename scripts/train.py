@@ -195,7 +195,8 @@ class Model(L.LightningModule):
                 self.trainer.save_checkpoint(
                     filepath=os.path.join(
                         self.save_dir, f"best_step={self.global_step}.ckpt"
-                    )
+                    ),
+                    weights_only=True,
                 )
         torch.cuda.empty_cache()
 
@@ -459,75 +460,75 @@ def main():
             save_dir=save_dir,
             **cfg.optimize,
         )
-        if cfg.run.mode == "test":
-            loader = get_loader(cfg, stage="test", io_dft=io_dft)
-            trainer.test(lightning_model, loader)
+        # if cfg.run.mode == "test":
+        #    loader = get_loader(cfg, stage="test", io_dft=io_dft)
+        #    trainer.test(lightning_model, loader)
 
-        elif cfg.run.mode == "predict":
-            loader = get_loader(cfg, stage="predict", io_dft=io_dft)
+        # elif cfg.run.mode == "predict":
+        loader = get_loader(cfg, stage="predict", io_dft=io_dft)
 
-            t_predict_start = time.time()
-            predictions = trainer.predict(lightning_model, loader)
-            t_predict_total = time.time() - t_predict_start
+        t_predict_start = time.time()
+        predictions = trainer.predict(lightning_model, loader)
+        t_predict_total = time.time() - t_predict_start
 
-            num_atom_total = 0
-            num_pb_total = 0
-            MAX_PROCESSES = min(os.cpu_count(), 8) - 1
+        num_atom_total = 0
+        num_pb_total = 0
+        MAX_PROCESSES = min(os.cpu_count(), 8) - 1
 
-            logger.info(f"[Write]: using {MAX_PROCESSES} cores......")
-            t_write_start = time.time()
+        logger.info(f"[Write]: using {MAX_PROCESSES} cores......")
+        t_write_start = time.time()
 
-            tasks = []
-            if cfg.data.dft_software == "vasp":
-                for struct in predictions:
-                    task_args = (
-                        struct["name"],
-                        struct["aug"],
-                        struct["density"],
-                        struct["z"],
-                        struct["pos"],
-                        struct["cell"],
-                        struct["volume"],
-                    )
-                    tasks.append(task_args)
-                    num_atom_total += struct["nat"]
-                    num_pb_total += struct["npb"]
+        tasks = []
+        if cfg.data.dft_software == "vasp":
+            for struct in predictions:
+                task_args = (
+                    struct["name"],
+                    struct["aug"],
+                    struct["density"],
+                    struct["z"],
+                    struct["pos"],
+                    struct["cell"],
+                    struct["volume"],
+                )
+                tasks.append(task_args)
+                num_atom_total += struct["nat"]
+                num_pb_total += struct["npb"]
 
-            elif cfg.data.dft_software == "openmx":
-                for struct in predictions:
-                    task_args = (
-                        struct["name"],
-                        struct["density"],
-                    )
-                    tasks.append(task_args)
-                    num_atom_total += struct["nat"]
-                    num_pb_total += struct["npb"]
+        elif cfg.data.dft_software == "openmx":
+            for struct in predictions:
+                task_args = (
+                    struct["name"],
+                    struct["density"],
+                )
+                tasks.append(task_args)
+                num_atom_total += struct["nat"]
+                num_pb_total += struct["npb"]
 
-            elif cfg.data.dft_software == "abacus":
-                for struct in predictions:
-                    task_args = (
-                        struct["name"],
-                        struct["z"],
-                        struct["cell"],
-                        struct["pos"],
-                        struct["density"],
-                    )
-                    tasks.append(task_args)
-                    num_atom_total += struct["nat"]
-                    num_pb_total += struct["npb"]
+        elif cfg.data.dft_software == "abacus":
+            for struct in predictions:
+                task_args = (
+                    struct["name"],
+                    struct["z"],
+                    struct["cell"],
+                    struct["pos"],
+                    struct["density"],
+                )
+                tasks.append(task_args)
+                num_atom_total += struct["nat"]
+                num_pb_total += struct["npb"]
 
-            with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
-                pool.starmap(io_dft.write_density, tasks)
-            num_atom_total = num_atom_total[0]
-            num_pb_total = num_pb_total[0]
-            t_write_total = time.time() - t_write_start
+        with multiprocessing.Pool(processes=MAX_PROCESSES) as pool:
+            pool.starmap(io_dft.write_density, tasks)
+        num_atom_total = num_atom_total[0]
+        num_pb_total = num_pb_total[0]
+        t_write_total = time.time() - t_write_start
 
-            logger.info(
-                "[Stat]: "
-                + f"\n\taverage predict speed: {(num_atom_total/t_predict_total):.1f} atoms/s"
-                + f"\n\taverage predict speed: {(num_pb_total/t_predict_total):.0f} grids/s"
-                + f"\n\taverage write speed: {(num_atom_total/t_write_total):.1f} atoms/s"
-            )
+        logger.info(
+            "[Stat]: "
+            + f"\n\taverage predict speed: {(num_atom_total/t_predict_total):.1f} atoms/s"
+            + f"\n\taverage predict speed: {(num_pb_total/t_predict_total):.0f} grids/s"
+            + f"\n\taverage write speed: {(num_atom_total/t_write_total):.1f} atoms/s"
+        )
 
 
 if __name__ == "__main__":

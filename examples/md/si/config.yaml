@@ -1,0 +1,136 @@
+run:
+  seed: 42
+  device: cuda:0
+  num_gpus: 1
+  mode: predict # Options: "train", "test", "predict"
+  task: 2 # 0: density; 1: augmentation; 2: density & augmentation 
+  project: edengnn
+  name: si
+  save_dir: # 
+  log: offline
+  checkpoint: path/to/si.ckpt
+  resume: False # True only when restarting an interupted training
+  dtype: float32
+
+data:
+  dft_software: "vasp"
+  openmx:
+    # For the generatation of input files in the predicting stage
+    path_template: path/to/EdenGNN-main/scripts/openmx/template.dat
+    encut: 220 # control the real space grid density for integration. See the scf.energycutoff tag in OpenMX.
+    num_proc: 64 # number of cpus used for restart calculations
+  vasp:
+    lmix_max: 6
+    # for prediction
+    path_template: path/to/EdenGNN-main/scripts/vasp/template.incar
+    path_pp: /root/research/e3super-resolution/EdenGNN-main/scripts/vasp/pp
+    encut: 220 # eV
+    dir: /root/dataset/molecular_dynamics/gan/vasp_run_md # directory of scf calculations.     
+  abacus:
+    prefix: aiida
+    path_template: 
+    ecutwfc: 100 # Rydberg
+  dk_bz: 0.15 # the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
+  dk_band: 0.037 # the sampling density along high symmetry lines for plotting band structures.
+  plot_band: False # used in the inference stage. If true, convert to primitive cell   
+  # ----------------------------------------------------------------------------
+  # Dataset Loading Modes:
+  # 1. In-Memory Mode (graphdata: True): Loads a pre-processed monolithic .npz 
+  #    archive directly into RAM. (Memory-intensive, suitable for small datasets)
+  # 2. Lazy Loading / On-the-fly Mode (graphdata: False) [RECOMMENDED]: 
+  #    Reads and parses individual CHGCAR or binary files from the disk on demand 
+  #    during the training loop, based on the provided split lists.
+  # ----------------------------------------------------------------------------
+  path_train: /root/dataset/molecular_dynamics/gan/dataset_debug.txt # sad paths
+  path_val: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+  path_test: 
+  # ----------------------------------------------------------------------------
+  # txt files storing the input SAD CHGCAR paths for inference
+  # ----------------------------------------------------------------------------  
+  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+  # ----------------------------------------------------------------------------
+  # Currently EdenGNN only supports batch size = 1 to avoid OOM. Using batch > 1 
+  # will cause serious errors. I have tried batch > 1 with 1D arrays, and found 
+  # that it is not efficient for training.
+  # ----------------------------------------------------------------------------
+  num_workers: 4 # 
+  use_bin: False # True if using binary pseudo charge density data
+  batch_size: 1 
+  #graphdata: False
+
+optimize:
+  loss_dict:
+    grid_func_out: 
+      weight_train: 1.
+      weight_val: 1.
+      loss: "L1"
+    aug_tensor: 
+      weight_train: 0.
+      weight_val: 0.
+      loss: "L1"
+    total_charge:
+      weight_train: 0.0
+      weight_val: 0.0
+      loss: "L2"
+  lr: 0.005
+  task: ${run.task}
+  freeze_basis: False
+  log_every_n_steps: 1
+  val_check_interval_steps:  # 
+  accumulate_grad_batches: 1 # default None. 
+  # set scheduler
+  scheduler: 
+    type: ReduceLROnPlateau
+    ReduceLROnPlateau:
+      factor: 0.5 # 
+      patience: 10 # 
+      min_lr: 0.00002
+      threshold: 0.00001
+  max_epochs: 3000
+  max_steps: 1000000     
+  # set optimizer 
+  optimizer:
+    type: AdamW
+    AdamW:
+      epsilon: 1e-8
+      beta1: 0.99
+      beta2: 0.999   
+  log_level: 0 # 0 default; 1 for debug    
+  gradient_clip_val: 0.0    
+
+model:
+  task: ${run.task}
+  lmix_max: ${data.vasp.lmix_max}
+  use_sad: False # whether or not output total charge density. if False, only output difference charge density
+  chunk_size_train: 1000000 # Maximum number of probe points per training step (depends on your GPU memory)
+  chunk_size_predict: 1000000 # Maximum number of probe points per prediction step (depends on your GPU memory) 
+  atom:
+    l_max: 6
+    num_types: 100
+    edge:
+      n_radial_basis: 8
+      radial_type: Bessel
+      cutoff: 4.0 # the maximum distance between neighbor atoms
+    conv:
+      num_conv_layers: 3
+      num_radial_filter_neurons: 64
+      num_radial_filter_layers: 2   
+      irreps_node_features: 64x0e+64x0o+20x1o+20x1e+16x2o+16x2e+8x3o+8x3e+6x4o+6x4e+5x5e+5x5o+4x6e+4x6o
+  probe:
+    l_max: 6
+    edge:
+      n_radial_basis: 8
+      n_z_embedding_dim: 8
+      n_z_embedding_neurons: 20
+      n_z_embedding_layers: 2      
+      cutoff: 3.0 # the radius which determines the neighbor grids for atoms.
+      regularization: False
+    conv: 
+      num_radial_filter_neurons: 20
+      num_radial_filter_layers: 2
+      n_channels: 4 # the number of radial basis for each angular quantum number.
+
+wandb:
+  project: ${run.project}
+  name: ${run.name}
+  mode: ${run.log}
