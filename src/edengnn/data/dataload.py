@@ -93,16 +93,6 @@ class AugDataset(torch.utils.data.Dataset):
                     os.path.join(path_scf, "aug.npz"), allow_pickle=True
                 )["data_aug"].item()["total"]
 
-        # because parsing chgcar is extremely slow, I deprecated reading
-        # augmentation occupancies from chgcar files.
-        # else:
-        #    chgcar_sad = Chgcar.from_file(os.path.join(path, "CHGCAR"))
-        #    structure = chgcar_sad.structure
-        #    aug_lines_in = chgcar_sad.data_aug["total"]
-        #    if not self.stage_predict:
-        #        chgcar = Chgcar.from_file(os.path.join(self.dir, f"{name}", "CHGCAR"))
-        #        aug_lines = chgcar.data_aug["total"]
-
         z = structure.atomic_numbers
         pos = structure.cart_coords
         cell = structure.lattice.matrix
@@ -237,3 +227,38 @@ class DensityDataset(torch.utils.data.Dataset):
             data["lmix_max"] = self.io_dft.lmix_max
 
         return data
+
+
+class OperatorDataset(torch.utils.data.Dataset):
+    def __init__(self, split, cutoff, io_dft):
+        self.cutoff = cutoff
+        self.io_dft = io_dft
+        with open(split, "r") as f:
+            self.paths = [line.strip() for line in f]
+        return None
+
+    def __len__(self):
+        return len(self.paths)
+
+    def __getitem__(self, index):
+        path = self.paths[index]
+
+        # load operator
+        (
+            name,
+            cell,
+            z,
+            pos,
+            edge_index_operator,
+            edge_vec_operator,
+            nbr_shift_operator,
+            operator,
+        ) = self.io_dft.read_data(path)
+
+        # use vesin to determin the neighbor list
+        nl = NeighborList(cutoff=self.cutoff, full_list=True)
+        edge_index_atoms, edge_vec_atoms, cell_shift = nl.compute(
+            points=pos, box=cell, periodic=True, quantities="PDS"
+        )
+        nbr_shift = cell_shift @ cell  # convert to Cartesian
+        return None
