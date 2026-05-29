@@ -14,6 +14,7 @@ from .nequip.nn import (
 )
 from .nequip.nn.nonlinearities import ShiftedSoftPlus
 from edengnn.data.io.vasp.basis import AUG_IRREPS
+from edengnn.data.io.abacus.pseudo import BASIS, BASIS_SIZE, BASIS_START
 
 
 class DensityLayer(torch.nn.Module):
@@ -117,7 +118,7 @@ class DensityLayer(torch.nn.Module):
 
     def reshape_irreps(self, tensor):
         """---------------------------------------------------------------------
-        change irreps from e3nn form [c * l1 + c8 l2 + ...] to [c][l1+l2+...]
+        change irreps from e3nn form [c * l1 + c * l2 + ...] to [c][l1+l2+...]
         ---------------------------------------------------------------------"""
         shape = tensor.shape
         tensor_flat = tensor.reshape(-1, shape[-1])
@@ -277,6 +278,210 @@ class AugmentationLayer(torch.nn.Module):
     def __init__(
         self,
         irreps_node_features,
+    ):
+        super().__init__()
+        # conv node feature to output
+        self.conv_to_output_node = AtomwiseLinear(
+            out_field="node_aug",
+            irreps_in={
+                AtomicDataDict.NODE_FEATURES_KEY: e3nn.o3.Irreps(irreps_node_features)
+            },
+            irreps_out=e3nn.o3.Irreps(AUG_IRREPS),
+        )
+
+    def forward(self, data):
+        self.conv_to_output_node(data)
+
+
+class OperatorOffsiteLayer(torch.nn.Module):
+    def __init__(
+        self,
+        irreps_node_features,
+        cutoff=15.0,
+        l_max=4,
+        n_channels=4,
+        n_radial_basis=8,
+    ):
+        super().__init__()
+
+        """        
+        
+        output Hermitian operator
+        
+        l_max: maximum l in basis
+    
+        cutoff: hybrid functional interaction cutoff radius, 15 Angstrom is enough
+        for HSE functional.
+        
+        basis: atomic orbital angular quantum numbers of operator, for example:
+            [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4]
+        
+        """
+
+        self.l_max = l_max
+        self.cutoff = cutoff
+        self.basis = BASIS
+        self.basis_size = BASIS_SIZE
+        self.basis_start = BASIS_START
+
+        self.basis_ylm_start = [0]
+        count = 0
+        for l in range(self.l_max + 1):
+            count += 2 * l + 1
+            self.basis_ylm_start.append(count)
+
+        irreps_offsite_features = e3nn.o3.Irreps(
+            [
+                (n_channels, (l, -1)) if l % 2 else (n_channels, (l, 1))
+                for l in range(self.l_max + 1)
+            ]
+        )
+
+        # l_index for spherical harmonics l wise product
+        index = []
+        for l in range(self.l_max + 1):
+            index += [l] * (2 * l + 1)
+        self.l_index = torch.tensor(index)
+
+        self.coord_change = torch.LongTensor([1, 2, 0])
+        self.spharm_edges = e3nn.o3.SphericalHarmonics(
+            irreps_out=e3nn.o3.Irreps(
+                [(1, (l, -1)) if l % 2 else (1, (l, 1)) for l in range(self.l_max + 1)]
+            ),
+            normalization="integral",
+            normalize=True,
+        )
+
+        # Equivariant linear layer which transforms node features to offsite
+        # features for T \otimes T
+        self.linear_to_offsite_TT = AtomwiseLinear(
+            out_field="node_offsite_TT",
+            irreps_in={
+                AtomicDataDict.NODE_FEATURES_KEY: e3nn.o3.Irreps(irreps_node_features)
+            },
+            irreps_out=irreps_offsite_features,
+        )
+
+        # Equivariant linear layer which transforms node features to offsite
+        # features for T \otimes Y
+        self.linear_to_offsite_TY = AtomwiseLinear(
+            out_field="node_offsite_TY",
+            irreps_in={
+                AtomicDataDict.NODE_FEATURES_KEY: e3nn.o3.Irreps(irreps_node_features)
+            },
+            irreps_out=irreps_offsite_features,
+        )
+
+        # reshape_index for reshape irreps feature
+        index = [[] for _ in range(n_channels)]
+        idx = 0
+        for l in range(self.l_max + 1):
+            for c in range(n_channels):
+                index[c] += list(range(idx, idx + 2 * l + 1, 1))
+                idx += 2 * l + 1
+        self.reshape_index = torch.tensor(index)
+
+        # edge embedding
+        self.radial_basis_probe = BesselBasis(
+            cutoff=cutoff,
+            n_rbf=n_radial_basis,
+            cutoff_func=CosineCutoff(cutoff=cutoff),
+        )
+
+        # radial filter of F and G
+        self.size_cnl = self.n_channels * len(basis)
+        self.edge_net = e3nn.nn.FullyConnectedNet(
+            [n_radial_basis]
+            + num_radial_filter_layers * [num_radial_filter_neurons]
+            + [2 * self.size_cnl**2],
+            ShiftedSoftPlus,
+        )
+
+    def reshape_irreps(self, tensor):
+        """---------------------------------------------------------------------
+        change irreps from e3nn form [c * l1 + c * l2 + ...] to [c][l1+l2+...]
+        ---------------------------------------------------------------------"""
+        shape = tensor.shape
+        tensor_flat = tensor.reshape(-1, shape[-1])
+        out = tensor_flat[:, self.reshape_index]
+        out_shape = shape[:-1] + (self.n_channels, self.reshape_index.shape[1])
+        return out.reshape(out_shape)
+
+    def forward(self, data, batch=None):
+        """ """
+        #
+        # add norm activation with residual shortcut in the future
+        #
+
+        # geometric information
+        operator_edge_length = torch.linalg.norm(data["edge_vec_operator"], dim=-1)
+        operator_edge = data["edge_vec_operator"][:, self.coord_change]
+        Y_lm = self.spharm_edges(operator_edge)
+        Y_lm_inverse = self.spharm_edges(-operator_edge)
+
+        # equivariant transform of node features
+        self.linear_to_offsite_TT(data)
+        self.linear_to_offsite_TY(data)
+
+        # calculate offsite features
+        Ta_clm = self.reshape_irreps(data["node_offsite_TT"])
+        _Ta_clm = self.reshape_irreps(data["node_offsite_TY"])
+        i, j = data["edge_index_operator"]
+        Tab_clm = _Ta_clm[i] + _Ta_clm[j]
+
+        # calculate symmetrize radial filters
+        n_edge = len(operator_edge_length)
+        radial_embedding = self.radial_basis_probe(operator_edge_length)
+        radial_filters = self.edge_net(radial_embedding).reshpae(
+            n_edge, self.size_cnl, self.size_cnl, 2
+        )
+        radial_filters = 0.5 * (radial_filters + torch.transpose(radial_filters, 1, 2))
+        radial_filters = radial_filters.reshape(
+            n_edge, self.n_channels, self.basis, self.n_channels, self.basis, 2
+        )
+
+        F_cnlcnl = radial_filters[:, :, :, :, :, 0]
+        G_cnlcnl = radial_filters[:, :, :, :, :, 0]
+
+        operator_offsite = torch.zeros((n_edge, self.basis_size, self.basis_size))
+        # assemble offsite operator
+        for i, li in enumerate(self.basis):
+            for j, lj in enumerate(self.basis):
+                idx_i = self.basis_start[i]
+                idx_j = self.basis_start[j]
+                idx_Y_i = self.basis_ylm_start[li]
+                idx_Y_j = self.basis_ylm_start[lj]
+
+                operator_offsite[:, idx_i + 2 * li + 1, idx_j + 2 * lj + 1] = (
+                    torch.einsum(
+                        "ncij,nc->nij",
+                        Tab_clm[:, :, idx_Y_i : 2 * li + 1].unsqueeze(-1)
+                        * Y_lm[:, None, idx_Y_j : 2 * lj + 1].unsqueeze(-2),
+                        F_cnlcnl[:, :, i, :, j].sum(dim=3),
+                    )
+                    + torch.einsum(
+                        "ncij,nc->nij",
+                        Tab_clm[:, :, idx_Y_j : 2 * lj + 1].unsqueeze(-2)
+                        * Y_lm_inverse[:, None, idx_Y_i : 2 * li + 1].unsqueeze(-1),
+                        F_cnlcnl[:, :, i, :, j].sum(dim=1),
+                    )
+                    + torch.einsum(
+                        "ncdij,ncd->nij",
+                        (Ta_clm[i])[:, :, idx_Y_i : 2 * li + 1].unzqueeze(-1)
+                        * (Ta_clm[j])[:, :, idx_Y_j : 2 * lj + 1].unzqueeze(-2),
+                        G_cnlcnl[:, :, i, :, j],
+                    )
+                )
+
+        operator_offsite = operator_offsite * data["operator_offsite_mask"]
+        return {"operator_offsite_out": operator_offsite}
+
+
+class OperatorOnsiteLayer(torch.nn.Module):
+    def __init__(
+        self,
+        irreps_node_features,
+        l_max,
     ):
         super().__init__()
         # conv node feature to output
