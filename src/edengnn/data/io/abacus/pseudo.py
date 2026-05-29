@@ -140,3 +140,45 @@ BASIS_dict = {
     "Li": "Li_gga_7au_100Ry_4s1p.orb",
     "Pd": "Pd_gga_7au_100Ry_4s2p2d1f.orb",
 }
+
+
+BASIS = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4]
+BASIS_START = [0, 1, 2, 3, 4, 7, 10, 13, 16, 21, 26, 33, 40]
+
+BASIS_INDEX_ABACUS2E3NN = []
+count_m = 0
+for l in BASIS:
+    for m in range(l):
+        BASIS_INDEX_ABACUS2E3NN.append(count_m + 2 * l - 2 * m)
+    BASIS_INDEX_ABACUS2E3NN.append(count_m)
+    for m in range(l):
+        BASIS_INDEX_ABACUS2E3NN.append(count_m + 2 * m + 1)
+    count_m += 2 * l + 1
+
+BASIS_INDEX_E3NN2ABACUS = []
+count_m = 0
+for l in BASIS:
+    BASIS_INDEX_E3NN2ABACUS.append(count_m + l)
+    for m in range(l):
+        BASIS_INDEX_E3NN2ABACUS.append(count_m + l + m + 1)
+        BASIS_INDEX_E3NN2ABACUS.append(count_m + l - m - 1)
+    count_m += 2 * l + 1
+
+BASIS_SIZE = 0
+for l in BASIS:
+    BASIS_SIZE += 2 * l + 1
+
+# basis_irreps stores the angular momentum quantum numbers
+BASIS_IRREPS = {
+    1: [0, 0, 1],  # H
+    14: [0, 0, 1, 1, 2],  # Si
+    31: [0, 0, 1, 1, 2, 2, 3],  # Ga
+    33: [0, 0, 1, 1, 2],  # As
+}
+# basis_idx stores the start positions in tensors of BASIS
+BASIS_IDX = {
+    1: [0, 1, 4],  # H
+    14: [0, 1, 4, 7, 16],  # Si
+    31: [0, 1, 4, 7, 16, 21, 26],  # Ga
+    33: [0, 1, 4, 7, 16],  # As
+}
