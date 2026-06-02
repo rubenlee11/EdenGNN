@@ -1,5 +1,13 @@
 import numpy as np
-import pathlib
+import pathlib, os
+from edengnn.data.io.utils import BOHR
+from edengnn.data.io.abacus.pseudo import (
+    BASIS_INDEX_ABACUS2E3NN,
+    BASIS_INDEX_E3NN2ABACUS,
+    BASIS_SIZE,
+    BASIS_IRREPS,
+    BASIS_IDX,
+)
 
 
 class IO_Abacus_Operator:
@@ -55,16 +63,16 @@ class IO_Abacus_Operator:
             if np.max(np.abs(array)) >= self.threshold:
                 # read the edge index and the cell shift of the operator block
                 _edge = [int(x) for x in key.split("_")[1:]]
-                i, j = _edge[:2]
-                shift = _edge[2:]
+                iedge, jedge = _edge[:2]
+                shift = np.array(_edge[2:])
 
                 # reshape the operator block into (BASIS, BASIS)
                 _data = array * self.unit
 
-                lis = basis_irreps[z[i]]
-                lis_idx = basis_idx[z[i]]
-                ljs = basis_irreps[z[j]]
-                ljs_idx = basis_idx[z[j]]
+                lis = BASIS_IRREPS[z[iedge]]
+                lis_idx = BASIS_IDX[z[iedge]]
+                ljs = BASIS_IRREPS[z[jedge]]
+                ljs_idx = BASIS_IDX[z[jedge]]
 
                 block = np.zeros((BASIS_SIZE, BASIS_SIZE))
                 block_mask = np.zeros((BASIS_SIZE, BASIS_SIZE))
@@ -86,14 +94,14 @@ class IO_Abacus_Operator:
                         _idx_j += 2 * lj + 1
                     _idx_i += 2 * li + 1
 
-                if i == j and shift == 0:
+                if iedge == jedge and (shift == 0).all():
                     # onsite
                     operator_onsite.append(block)
                     operator_onsite_mask.append(block_mask)
-                    onsite_index.append(i)
+                    onsite_index.append(iedge)
                 else:
                     # offsite
-                    edge_index.append([i, j])
+                    edge_index.append(np.array([iedge, jedge]))
                     cell_shift.append(shift)
                     operator_offsite.append(block)
                     operator_offsite_mask.append(block_mask)
@@ -101,7 +109,8 @@ class IO_Abacus_Operator:
         npz_data.close()
 
         # onsite information
-        operator_onsite = np.array(operator_onsite)
+        operator_onsite = np.stack(operator_onsite)
+        operator_onsite_mask = np.stack(operator_onsite_mask)
         # change index
         operator_onsite = operator_onsite[:, BASIS_INDEX_ABACUS2E3NN, :][
             :, :, BASIS_INDEX_ABACUS2E3NN
@@ -118,9 +127,10 @@ class IO_Abacus_Operator:
             operator_onsite_mask = operator_onsite_mask[sort_indices]
 
         # offsite information
-        edge_index = np.array(edge_index)
-        cell_shift = np.array(cell_shift)
-        operator_offsite = np.array(operator_offsite)
+        edge_index = np.stack(edge_index)
+        cell_shift = np.stack(cell_shift)
+        operator_offsite = np.stack(operator_offsite)
+        operator_offsite_mask = np.stack(operator_offsite_mask)
         # change index
         operator_offsite = operator_offsite[:, BASIS_INDEX_ABACUS2E3NN, :][
             :, :, BASIS_INDEX_ABACUS2E3NN
@@ -128,6 +138,7 @@ class IO_Abacus_Operator:
         operator_offsite_mask = operator_offsite_mask[:, BASIS_INDEX_ABACUS2E3NN, :][
             :, :, BASIS_INDEX_ABACUS2E3NN
         ]
+        operator_offsite_mask.fill(0)
 
         # calculate cell shift vectors
         nbr_shift = cell_shift @ cell
@@ -135,6 +146,10 @@ class IO_Abacus_Operator:
         i = edge_index[:, 0]
         j = edge_index[:, 1]
         edge_vec = pos[j] - pos[i] + nbr_shift
+
+        # concatenate operator
+        operator = np.concatenate([operator_onsite, operator_offsite])
+        operator_mask = np.concatenate([operator_onsite_mask, operator_offsite_mask])
 
         return (
             name,
@@ -144,10 +159,8 @@ class IO_Abacus_Operator:
             edge_index,
             edge_vec,
             nbr_shift,
-            operator_onsite,
-            operator_onsite_mask,
-            operator_offsite,
-            operator_offsite_mask,
+            operator,
+            operator_mask,
         )
 
     def write_data(self):
