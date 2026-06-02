@@ -144,6 +144,7 @@ BASIS_dict = {
 
 BASIS = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4]
 BASIS_START = [0, 1, 2, 3, 4, 7, 10, 13, 16, 21, 26, 33, 40]
+L_MAX = 4
 
 BASIS_INDEX_ABACUS2E3NN = []
 count_m = 0

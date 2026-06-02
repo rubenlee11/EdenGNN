@@ -10,7 +10,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from edengnn.data.dataload import get_loader
-from edengnn.model.model import EfficientDensity
+from edengnn.model.model import EfficientDensity, HermitianOperator
+from edengnn.data.io.utils import RYDBERG
 
 colors = plt.cm.tab10.colors
 
@@ -26,10 +27,13 @@ class Model(L.LightningModule):
         wandb_run,
         logger,
         save_dir,
+        compile,
         **kwargs,
     ):
         super().__init__()
         self.model = model
+        if compile:
+            self.model = torch.compile(self.model, dynamic=True)
         self.wandb_run = wandb_run
         self.logger_ = logger
         self.save_dir = save_dir
@@ -44,7 +48,6 @@ class Model(L.LightningModule):
 
         self.log_every_n_steps = kwargs.get("log_every_n_steps", 1)
         self.check_val_every_n_epoch = kwargs.get("check_val_every_n_epoch", 1)
-        self.log_level = kwargs.get("log_level", 0)
 
         self.val_check_interval_steps = kwargs.get("val_check_interval_steps", None)
         self.optimizer = kwargs.get("optimizer", None)
@@ -54,10 +57,11 @@ class Model(L.LightningModule):
         self.task = kwargs.get("task", 2)
 
         self.best_val = torch.tensor(float("inf"))
-        # for parity plot of augmentation occupancy
+        # for parity plots
         self.preds_aug = []
         self.targets_aug = []
-        self.predictions = []
+        self.preds_operator = []
+        self.targets_operator = []
 
     def forward(self, batch):
         return self.model(batch)
@@ -71,19 +75,15 @@ class Model(L.LightningModule):
 
         loss = 0
         for key, value in output.items():
-            if key == "aug_tensor":
+            if key == "aug_tensor" or key == "operator":
+                if key == "aug_tensor":
+                    key_mask = "aug_mask"
+                elif key == "operator":
+                    key_mask = "operator_mask"
                 loss += (
                     self.loss_fn[self.loss_dict[key]["loss"]](
-                        batch[key].flatten()[batch["aug_mask"]],
-                        value.flatten()[batch["aug_mask"]],
-                    )
-                    * self.loss_dict[key]["weight_train"]
-                )
-
-            elif key == "total_charge":
-                loss += (
-                    self.loss_fn[self.loss_dict[key]["loss"]](
-                        batch["grid_func_out"].mean(), value
+                        batch[key].flatten()[batch[key_mask]],
+                        value.flatten()[batch[key_mask]],
                     )
                     * self.loss_dict[key]["weight_train"]
                 )
@@ -102,15 +102,9 @@ class Model(L.LightningModule):
                 }
             )
             lr = self.optimizers().param_groups[0]["lr"]
-            if self.log_level == 0:
-                self.logger_.info(
-                    f"[Train] Step {self.global_step}, Loss: {loss.item():.4f}, lr: {lr}"
-                )
-            elif self.log_level == 1:
-                self.logger_.info(
-                    f"[Train] Step {self.global_step}, Loss: {loss.item():.4f}, lr: {lr}, \
-                    name: {batch["name"]}, number of atoms: {batch["nat"]}, number of points: {batch["npb"]}"
-                )
+            self.logger_.info(
+                f"[Train] Step {self.global_step}, Loss: {loss.item():.4f}, lr: {lr}"
+            )
 
         return loss
 
@@ -131,6 +125,12 @@ class Model(L.LightningModule):
                 losses[key] = self.loss_fn["L1"](aug_tar, aug_pre)
                 self.targets_aug.append(aug_tar.detach().cpu())
                 self.preds_aug.append(aug_pre.detach().cpu())
+            elif key == "operator":
+                tar = batch[key].flatten()[batch["operator_mask"]]
+                pre = value.flatten()[batch["operator_mask"]]
+                losses[key] = self.loss_fn["L1"](tar, pre)
+                self.targets_operator.append(tar.detach().cpu())
+                self.preds_operator.append(pre.detach().cpu())
             elif key == "total_charge":
                 losses[key] = (
                     self.loss_fn["L1"](value, batch["grid_func_out"].mean())
@@ -180,7 +180,7 @@ class Model(L.LightningModule):
         self.wandb_run.log(wandb_dict)
         self.logger_.info(info_log)
 
-        self._plot_aug()
+        self._plot_parity()
         #
         # self.lr_schedulers().step(val_metrics["val/loss"])
 
@@ -278,26 +278,31 @@ class Model(L.LightningModule):
 
         return [optimizer], [scheduler]
 
-    def _plot_aug(self):
+    def _plot_parity(self):
         if len(self.targets_aug) > 0:
             preds = torch.cat(self.preds_aug)
             targets = torch.cat(self.targets_aug)
-
-            plt.figure()
-            plt.plot(
-                [targets.min(), targets.max()],
-                [targets.min(), targets.max()],
-                color=colors[1],
-            )
-            plt.scatter(targets, preds, s=2, color=colors[0], zorder=10)
-            plt.xlabel("True")
-            plt.ylabel("Pred")
-            plt.title("Parity Plot--Aug")
-            img_path = os.path.join(self.save_dir, "parity_aug_val.png")
-            plt.savefig(img_path, dpi=300, bbox_inches="tight")
-            plt.close()
             self.targets_aug = []
             self.preds_aug = []
+        elif len(self.targets_operator) > 0:
+            preds = torch.cat(self.preds_operator)
+            targets = torch.cat(self.targets_operator)
+            self.targets_operator = []
+            self.preds_operator = []
+
+        plt.figure()
+        plt.plot(
+            [targets.min(), targets.max()],
+            [targets.min(), targets.max()],
+            color=colors[1],
+        )
+        plt.scatter(targets, preds, s=2, color=colors[0], zorder=10)
+        plt.xlabel("True")
+        plt.ylabel("Pred")
+        plt.title("Parity Plot")
+        img_path = os.path.join(self.save_dir, "parity_plot.png")
+        plt.savefig(img_path, dpi=300, bbox_inches="tight")
+        plt.close()
 
 
 def main():
@@ -334,7 +339,10 @@ def main():
     )
 
     logger.info("[Init] Building model...")
-    model = EfficientDensity(cfg.model).to(DTYPE)
+    if cfg.run.task == 3:
+        model = HermitianOperator(cfg.model).to(DTYPE)
+    else:
+        model = EfficientDensity(cfg.model).to(DTYPE)
     logger.info("%s", OmegaConf.to_yaml(cfg.model))
 
     wandb_run = wandb.init(
@@ -399,18 +407,23 @@ def main():
             plot_band=cfg.data.plot_band,
         )
     elif cfg.data.dft_software == "abacus":
-        from edengnn.data.io.abacus.parse_density import IO_Abacus
+        if cfg.run.task == 3:
+            from edengnn.data.io.abacus.parse_operator import IO_Abacus_Operator
 
-        io_dft = IO_Abacus(
-            stage=cfg.run.mode,
-            save_dir=save_dir,
-            prefix=cfg.data.abacus.prefix,
-            path_template=cfg.data.abacus.path_template,
-            ecutwfc=cfg.data.abacus.ecutwfc,
-            dk_bz=cfg.data.dk_bz,
-            dk_band=cfg.data.dk_band,
-            plot_band=cfg.data.plot_band,
-        )
+            io_dft = IO_Abacus_Operator(threshold=1e-5 / RYDBERG, unit=RYDBERG)
+        else:
+            from edengnn.data.io.abacus.parse_density import IO_Abacus
+
+            io_dft = IO_Abacus(
+                stage=cfg.run.mode,
+                save_dir=save_dir,
+                prefix=cfg.data.abacus.prefix,
+                path_template=cfg.data.abacus.path_template,
+                ecutwfc=cfg.data.abacus.ecutwfc,
+                dk_bz=cfg.data.dk_bz,
+                dk_band=cfg.data.dk_band,
+                plot_band=cfg.data.plot_band,
+            )
 
     if cfg.run.mode == "train":
         train_loader = get_loader(cfg, stage="train", io_dft=io_dft)
@@ -421,6 +434,7 @@ def main():
                 wandb_run=wandb_run,
                 logger=logger,
                 save_dir=save_dir,
+                compile=cfg.model.compile,
                 **cfg.optimize,
             )
             trainer.fit(
@@ -436,6 +450,7 @@ def main():
                 wandb_run=wandb_run,
                 logger=logger,
                 save_dir=save_dir,
+                compile=cfg.model.compile,
                 **cfg.optimize,
             )
             trainer.fit(lightning_model, train_loader, val_loader)
@@ -448,6 +463,7 @@ def main():
                 wandb_run=wandb_run,
                 logger=logger,
                 save_dir=save_dir,
+                compile=cfg.model.compile,
                 **cfg.optimize,
             )
             trainer.fit(lightning_model, train_loader, val_loader)
@@ -458,6 +474,7 @@ def main():
             wandb_run=wandb_run,
             logger=logger,
             save_dir=save_dir,
+            compile=cfg.model.compile,
             **cfg.optimize,
         )
         # if cfg.run.mode == "test":

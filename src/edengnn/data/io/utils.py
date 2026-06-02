@@ -2,6 +2,7 @@ import numpy as np
 from edengnn.data.io.utils_f import utils
 
 BOHR = 0.5291772109
+RYDBERG = 13.6057039763
 
 
 def _round_for_fft(n):

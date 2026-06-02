@@ -27,7 +27,7 @@ def get_loader(cfg, stage, io_dft):
             stage=stage,
             use_bin=cfg.data.use_bin,
         )
-    else:
+    elif cfg.model.task == 0 or cfg.model.task == 2:
         dataset = DensityDataset(
             path,
             cfg.model.atom.edge.cutoff,
@@ -36,6 +36,8 @@ def get_loader(cfg, stage, io_dft):
             stage=stage,
             dft_software=cfg.data.dft_software,
         )
+    elif cfg.model.task == 3:
+        dataset = OperatorDataset(path, cfg.model.atom.edge.cutoff, io_dft=io_dft)
     return DataLoader(
         dataset,
         batch_size=cfg.data.batch_size,
@@ -243,6 +245,8 @@ class OperatorDataset(torch.utils.data.Dataset):
         self.io_dft = io_dft
         with open(split, "r") as f:
             self.paths = [line.strip() for line in f]
+
+        self.dtype = torch.get_default_dtype()
         return None
 
     def __len__(self):
@@ -260,10 +264,8 @@ class OperatorDataset(torch.utils.data.Dataset):
             edge_index_operator,
             edge_vec_operator,
             nbr_shift_operator,
-            operator_onsite,
-            operator_onsite_mask,
-            operator_offsite,
-            operator_offsite_mask,
+            operator,
+            operator_mask,
         ) = self.io_dft.read_data(path)
 
         # use vesin to determin the neighbor list
@@ -280,11 +282,9 @@ class OperatorDataset(torch.utils.data.Dataset):
             edge_index=torch.LongTensor(edge_index_atoms.T),
             edge_vec_atoms=torch.tensor(edge_vec_atoms, dtype=self.dtype),
             nbr_shift=torch.tensor(nbr_shift, dtype=self.dtype),
-            operator_onsite_out=torch.tensor(operator_onsite, dtype=self.dtype),
-            operator_onsite_mask=torch.LongTensor(operator_onsite_mask),
-            operator_offsite_out=torch.tensor(operator_offsite, dtype=self.dtype),
-            operator_offsite_mask=torch.LongTensor(operator_offsite_mask),
-            edge_index_operator=torch.LongTensor(edge_index_operator),
+            operator=torch.tensor(operator, dtype=self.dtype),
+            operator_mask=torch.LongTensor(operator_mask).bool().flatten(),
+            edge_index_operator=torch.LongTensor(edge_index_operator.T),
             edge_vec_operator=torch.tensor(edge_vec_operator, dtype=self.dtype),
             nbr_shift_operator=torch.tensor(nbr_shift_operator, dtype=self.dtype),
             name=name,
