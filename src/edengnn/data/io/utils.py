@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from edengnn.data.io.utils_f import utils
 
 BOHR = 0.5291772109
@@ -6,6 +7,7 @@ BOHR3 = BOHR**3
 
 
 def _round_for_fft(n):
+    n = math.ceil(n)
     while True:
         temp = n
         for p in [2, 3, 5]:

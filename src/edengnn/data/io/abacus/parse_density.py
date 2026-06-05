@@ -65,7 +65,7 @@ class IO_Abacus:
                     coords=sp_res["primitive_positions"],
                     coords_are_cartesian=False,
                 )
-                self.write_kpt_line(
+                self.write_kpath(
                     os.path.join(self.save_dir, name, "KPT_BAND"),
                     structure,
                     sp_res["point_coords"],
@@ -139,13 +139,13 @@ class IO_Abacus:
         except:
             print(f"Could not find pseudo or basis files for {name}")
 
-    def write_kpt_line(self, path, structure, point_coords, k_path):
+    def write_kpath(self, path, structure, k_coords, k_path):
         kpts_lines = []
         kpt_labels = []
         r_cell = structure.lattice.reciprocal_lattice.matrix
         for i, (start_label, end_label) in enumerate(k_path):
-            k1_frac = np.array(point_coords[start_label])
-            k2_frac = np.array(point_coords[end_label])
+            k1_frac = np.array(k_coords[start_label])
+            k2_frac = np.array(k_coords[end_label])
 
             # Calculate distance in reciprocal space
             k1_cart = np.dot(k1_frac, r_cell)
