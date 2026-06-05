@@ -11,11 +11,9 @@ from ase.calculators.abacus import Abacus, AbacusProfile
 import numpy as np
 from pymatgen.core import Structure, Lattice
 from pymatgen.io.ase import AseAtomsAdaptor
-from edengnn.data.io.utils import BOHR, set_grid_fft
+from edengnn.data.io.utils import BOHR, BOHR3, set_grid_fft
 from edengnn.data.io.io_cube import io_cube
 from edengnn.data.io.abacus.pseudo import PP_dict, BASIS_dict
-
-BOHR3 = BOHR**3
 
 
 class IO_Abacus:
@@ -24,7 +22,6 @@ class IO_Abacus:
         stage="train",
         save_dir="",
         prefix="",
-        path_template="",
         ecutwfc=100,  # rydberg
         dk_bz=0.35,
         dk_band=0.05,
@@ -39,14 +36,7 @@ class IO_Abacus:
         self.dk_bz = dk_bz
         self.dk_band = dk_band
         self.plot_band = plot_band
-        self.path_template = path_template
         self.prefix = prefix
-
-        if self.path_template is not None:
-            with open(self.path_template, "r") as f:
-                self.template = f.read()
-        else:
-            self.template = ""
 
     def read_data(self, path):
         name = pathlib.Path(path).stem

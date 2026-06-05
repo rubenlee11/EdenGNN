@@ -3,7 +3,7 @@ from pymatgen.core import Structure, Lattice
 import numpy as np
 
 from edengnn.data.io.openmx.basis import spin_set, PAO_dict, PBE_dict
-from edengnn.data.io.utils import BOHR
+from edengnn.data.io.utils import BOHR, set_grid_lcao
 from pymatgen.core import Element
 
 nelec_dict = np.zeros((119))
@@ -76,7 +76,9 @@ class IO_OpenMX:
                     coords_are_cartesian=False,
                 )
                 # set the real space grid
-                n1, n2, n3 = _set_grid((structure.lattice.matrix) / BOHR, self.encut)
+                n1, n2, n3 = set_grid_lcao(
+                    (structure.lattice.matrix) / BOHR, self.encut
+                )
                 dat += self.write_dat(structure, name, n1, n2, n3)
                 dat += self.write_kpath(
                     structure, sp_res["point_coords"], sp_res["path"]
@@ -84,7 +86,9 @@ class IO_OpenMX:
             else:
                 structure = structure_
                 # set the real space grid
-                n1, n2, n3 = _set_grid((structure.lattice.matrix) / BOHR, self.encut)
+                n1, n2, n3 = set_grid_lcao(
+                    (structure.lattice.matrix) / BOHR, self.encut
+                )
                 dat += self.write_dat(structure, name, n1, n2, n3)
 
             with open(os.path.join(path_save, f"{name}.dat"), "w") as f:
@@ -260,21 +264,6 @@ def _read_rst(dir, name):
     # the 2.0 factor is due to OpenMX's convention
     density = (np.concatenate(rho_list)).reshape((n1, n2, n3), order="C") / BOHR3 * 2.0
     return density, n1, n2, n3
-
-
-def _set_grid(cell, encut=220):
-    """
-    Set automatically the real space grid for integration based on the cell and
-    the cutoff energy.
-    """
-    # encut: cutoff energy for integration in rydberg.
-    cell_G = np.linalg.inv(cell.T)
-    tmp = np.sqrt(encut) / np.pi
-    n1 = _round_for_fft(tmp / np.linalg.norm(cell_G[0]))
-    n2 = _round_for_fft(tmp / np.linalg.norm(cell_G[1]))
-    n3 = _round_for_fft(tmp / np.linalg.norm(cell_G[2]))
-
-    return n1, n2, n3
 
 
 def _round_for_fft(n):

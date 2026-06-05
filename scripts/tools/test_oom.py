@@ -88,10 +88,10 @@ def get_npoint(structure, mode, encut, radius):
     if mode == "lcao":
         n1, n2, n3 = _set_grid(cell, encut)
     elif mode == "pw":
-        n1, n2, n3 = set_grid_fft(cell, encut)
-        # n1 = a / DL
-        # n2 = b / DL
-        # n3 = c / DL
+        # n1, n2, n3 = set_grid_fft(cell, encut)
+        n1 = a / DL
+        n2 = b / DL
+        n3 = c / DL
 
     z = structure.atomic_numbers
     npb = len(z) * 4.0 * np.pi / 3.0 * radius**3 * n1 * n2 * n3 / omega

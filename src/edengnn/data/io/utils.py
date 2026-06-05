@@ -2,6 +2,7 @@ import numpy as np
 from edengnn.data.io.utils_f import utils
 
 BOHR = 0.5291772109
+BOHR3 = BOHR**3
 
 
 def _round_for_fft(n):
@@ -33,6 +34,21 @@ def set_grid_fft(cell, encut):
     n1 = _round_for_fft(2 * np.max(mill[:, 0]) + 1)
     n2 = _round_for_fft(2 * np.max(mill[:, 1]) + 1)
     n3 = _round_for_fft(2 * np.max(mill[:, 2]) + 1)
+    return n1, n2, n3
+
+
+def set_grid_lcao(cell, encut=220):
+    """
+    Set automatically the real space grid for integration based on the cell and
+    the cutoff energy.
+    """
+    # encut: cutoff energy for integration in rydberg.
+    cell_G = np.linalg.inv(cell.T)
+    tmp = np.sqrt(encut) / np.pi
+    n1 = _round_for_fft(tmp / np.linalg.norm(cell_G[0]))
+    n2 = _round_for_fft(tmp / np.linalg.norm(cell_G[1]))
+    n3 = _round_for_fft(tmp / np.linalg.norm(cell_G[2]))
+
     return n1, n2, n3
 
 
