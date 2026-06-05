@@ -405,8 +405,20 @@ def main():
             stage=cfg.run.mode,
             save_dir=save_dir,
             prefix=cfg.data.abacus.prefix,
-            path_template=cfg.data.abacus.path_template,
             ecutwfc=cfg.data.abacus.ecutwfc,
+            dk_bz=cfg.data.dk_bz,
+            dk_band=cfg.data.dk_band,
+            plot_band=cfg.data.plot_band,
+        )
+    elif cfg.data.dft_software == "siesta":
+        from edengnn.data.io.siesta.parse_density import IO_Siesta
+
+        io_dft = IO_Siesta(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            prefix=cfg.data.siesta.prefix,
+            filename_out=cfg.data.siesta.filename_out,
+            meshcutoff=cfg.data.siesta.meshcutoff,
             dk_bz=cfg.data.dk_bz,
             dk_band=cfg.data.dk_band,
             plot_band=cfg.data.plot_band,

@@ -83,11 +83,18 @@ data:
     # [check train] Abacus 'suffix' keywords. used for reading the training directories
     prefix: aiida
 
-    # [set] unused keywords
-    path_template: absolute/path/to/EdenGNN-main/scripts/vasp/template.incar
-
     # [default] in [Rydberg]. See Abacus manual. 
-    ecutwfc: 100 
+    ecutwfc: 100
+  
+  siesta:
+    # [check train] SIESTA 'SystemLabel' keywords. used for reading the training directories
+    prefix: aiida
+
+    # [check train] filename of the SIESTA output log
+    filename_out: siesta_out
+
+    # [default] in [Rydberg]. See SIESTA manual. 
+    meshcutoff: 300
 
   # [check predict] the sampling density (in Ang^{-1}) in the Brillouin zone. N_i = |b_i| / dk. 0.15 is accurate enough.
   dk_bz: 0.15     
