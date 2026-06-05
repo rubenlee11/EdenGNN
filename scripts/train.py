@@ -472,11 +472,7 @@ def main():
             save_dir=save_dir,
             **cfg.optimize,
         )
-        # if cfg.run.mode == "test":
-        #    loader = get_loader(cfg, stage="test", io_dft=io_dft)
-        #    trainer.test(lightning_model, loader)
 
-        # elif cfg.run.mode == "predict":
         loader = get_loader(cfg, stage="predict", io_dft=io_dft)
 
         t_predict_start = time.time()
@@ -523,6 +519,17 @@ def main():
                     struct["z"],
                     struct["cell"],
                     struct["pos"],
+                    struct["density"],
+                )
+                tasks.append(task_args)
+                num_atom_total += struct["nat"]
+                num_pb_total += struct["npb"]
+
+        elif cfg.data.dft_software == "siesta":
+            for struct in predictions:
+                task_args = (
+                    struct["name"],
+                    struct["cell"],
                     struct["density"],
                 )
                 tasks.append(task_args)
