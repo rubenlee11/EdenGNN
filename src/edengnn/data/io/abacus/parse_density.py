@@ -40,7 +40,6 @@ class IO_Abacus:
 
     def read_data(self, path):
         name = pathlib.Path(path).stem
-        os.makedirs(os.path.join(self.save_dir, name), exist_ok=True)
         if self.stage == "train":
             z, charges, cell, pos, density = _read_cube(
                 os.path.join(path, f"OUT.{self.prefix}", "chgdelta.cube")
@@ -48,6 +47,7 @@ class IO_Abacus:
             n1, n2, n3 = density.shape
             nelec = np.sum(charges)
         elif self.stage == "predict":
+            os.makedirs(os.path.join(self.save_dir, name), exist_ok=True)
             structure_ = Structure.from_file(path)
             if self.plot_band:
                 # --------------------------------------------------------------
