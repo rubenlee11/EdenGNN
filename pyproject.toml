@@ -10,5 +10,14 @@ authors = [
 ]
 dependencies = [
     "numpy",
+    "torch >= 2.0.0",
+    "torch_geometric",
+    "e3nn",
+    "lightning",
+    "meson",
+    "vesin",
+    "wandb",
+    "omegaconf",
+    "matplotlib"
 ]
 description = "EdenGNN: An Efficient E(3)-Equivariant Graph Neural Network for Charge Density Prediction"
