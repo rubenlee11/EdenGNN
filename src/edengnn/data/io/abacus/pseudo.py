@@ -1,3 +1,5 @@
+from edengnn.data.io.utils import init_basic_irreps
+
 PP_dict = {
     "Hf": "Hf.upf",
     "Cd": "Cd.upf",
@@ -144,6 +146,12 @@ BASIS_dict = {
 
 BASIS = [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4]
 BASIS_START = [0, 1, 2, 3, 4, 7, 10, 13, 16, 21, 26, 33, 40]
+
+IRREPS_ONSITE, I1I2_IDX_ONSITE, LEN_TENSOR_ONSITE = init_basic_irreps(BASIS)
+IRREPS_OFFSITE, I1I2_IDX_OFFSITE, LEN_TENSOR_OFFSITE = init_basic_irreps(
+    BASIS, mode="offsite"
+)
+
 L_MAX = 4
 
 BASIS_INDEX_ABACUS2E3NN = []

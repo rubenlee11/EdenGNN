@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "mesonpy"
-requires = ["meson-python", "ninja", "numpy>=1.26.0"]
+requires = ["meson-python", "ninja", "numpy"]
 
 [project]
 name = "edengnn"
@@ -9,6 +9,28 @@ authors = [
   { name="Xiwen Li", email="lixiwen2718@gmail.com" },
 ]
 dependencies = [
+    "ase",
+    "e3nn",
+    "lightning",
+    "matplotlib",
+    "meson",
+    "netCDF4",
     "numpy",
+    "omegaconf",
+    "pymatgen",
+    "PyYAML",
+    "seekpath",
+    "torch>=2.0.0",
+    "torch-ema",
+    "torch-geometric",
+    "torch-runstats",
+    "tqdm",
+    "vesin",
+    "wandb",
 ]
 description = "EdenGNN: An Efficient E(3)-Equivariant Graph Neural Network for Charge Density Prediction"
+
+[project.scripts]
+edengnn-run = "edengnn.cli:main"
+edengnn-train = "edengnn.cli:train"
+edengnn-predict = "edengnn.cli:predict"

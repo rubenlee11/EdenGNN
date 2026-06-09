@@ -11,11 +11,9 @@ from ase.calculators.abacus import Abacus, AbacusProfile
 import numpy as np
 from pymatgen.core import Structure, Lattice
 from pymatgen.io.ase import AseAtomsAdaptor
-from edengnn.data.io.utils import BOHR, set_grid_fft
+from edengnn.data.io.utils import BOHR, BOHR3, set_grid_fft
 from edengnn.data.io.io_cube import io_cube
 from edengnn.data.io.abacus.pseudo import PP_dict, BASIS_dict
-
-BOHR3 = BOHR**3
 
 
 class IO_Abacus:
@@ -24,7 +22,6 @@ class IO_Abacus:
         stage="train",
         save_dir="",
         prefix="",
-        path_template="",
         ecutwfc=100,  # rydberg
         dk_bz=0.35,
         dk_band=0.05,
@@ -39,18 +36,10 @@ class IO_Abacus:
         self.dk_bz = dk_bz
         self.dk_band = dk_band
         self.plot_band = plot_band
-        self.path_template = path_template
         self.prefix = prefix
-
-        if self.path_template is not None:
-            with open(self.path_template, "r") as f:
-                self.template = f.read()
-        else:
-            self.template = ""
 
     def read_data(self, path):
         name = pathlib.Path(path).stem
-        os.makedirs(os.path.join(self.save_dir, name), exist_ok=True)
         if self.stage == "train":
             z, charges, cell, pos, density = _read_cube(
                 os.path.join(path, f"OUT.{self.prefix}", "chgdelta.cube")
@@ -58,6 +47,7 @@ class IO_Abacus:
             n1, n2, n3 = density.shape
             nelec = np.sum(charges)
         elif self.stage == "predict":
+            os.makedirs(os.path.join(self.save_dir, name), exist_ok=True)
             structure_ = Structure.from_file(path)
             if self.plot_band:
                 # --------------------------------------------------------------
@@ -75,7 +65,7 @@ class IO_Abacus:
                     coords=sp_res["primitive_positions"],
                     coords_are_cartesian=False,
                 )
-                self.write_kpt_line(
+                self.write_kpath(
                     os.path.join(self.save_dir, name, "KPT_BAND"),
                     structure,
                     sp_res["point_coords"],
@@ -149,13 +139,13 @@ class IO_Abacus:
         except:
             print(f"Could not find pseudo or basis files for {name}")
 
-    def write_kpt_line(self, path, structure, point_coords, k_path):
+    def write_kpath(self, path, structure, k_coords, k_path):
         kpts_lines = []
         kpt_labels = []
         r_cell = structure.lattice.reciprocal_lattice.matrix
         for i, (start_label, end_label) in enumerate(k_path):
-            k1_frac = np.array(point_coords[start_label])
-            k2_frac = np.array(point_coords[end_label])
+            k1_frac = np.array(k_coords[start_label])
+            k2_frac = np.array(k_coords[end_label])
 
             # Calculate distance in reciprocal space
             k1_cart = np.dot(k1_frac, r_cell)

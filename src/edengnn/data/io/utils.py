@@ -1,11 +1,14 @@
 import numpy as np
+import math
 from edengnn.data.io.utils_f import utils
 
 BOHR = 0.5291772109
+BOHR3 = BOHR**3
 RYDBERG = 13.6057039763
 
 
 def _round_for_fft(n):
+    n = math.ceil(n)
     while True:
         temp = n
         for p in [2, 3, 5]:
@@ -34,6 +37,21 @@ def set_grid_fft(cell, encut):
     n1 = _round_for_fft(2 * np.max(mill[:, 0]) + 1)
     n2 = _round_for_fft(2 * np.max(mill[:, 1]) + 1)
     n3 = _round_for_fft(2 * np.max(mill[:, 2]) + 1)
+    return n1, n2, n3
+
+
+def set_grid_lcao(cell, encut=220):
+    """
+    Set automatically the real space grid for integration based on the cell and
+    the cutoff energy.
+    """
+    # encut: cutoff energy for integration in rydberg.
+    cell_G = np.linalg.inv(cell.T)
+    tmp = np.sqrt(encut) / np.pi
+    n1 = _round_for_fft(tmp / np.linalg.norm(cell_G[0]))
+    n2 = _round_for_fft(tmp / np.linalg.norm(cell_G[1]))
+    n3 = _round_for_fft(tmp / np.linalg.norm(cell_G[2]))
+
     return n1, n2, n3
 
 
@@ -68,40 +86,37 @@ def pos2n(cell, grid_shape, pos):
     return n_grid, grid
 
 
-def get_mask_r_deprecated(cell, grid_shape, radius=4.0):
+def init_basic_irreps(basis, mode="onsite"):
     """
-    Specify probe index. The algorithm can be improved.
-
-    reminicent of setting k grid in PW DFT. use the same technique to bound the mask index
-
-    cell[0,:] [1,:], [2,:] is a1, a2, a3 vectors
-    grid_shape: (n1, n2, n3) is the number of grid points in each direction
+    transform operator into irreps
     """
+    irreps = []
+    num_basis = len(basis)
+    block_start = [
+        [0] * num_basis for _ in range(num_basis)
+    ]  # map from basis index to irreps tensor start position
 
-    N1, N2, N3 = grid_shape
-    grid = np.array([cell[0] / N1, cell[1] / N2, cell[2] / N3])
+    count = 0
 
-    cell_G = np.linalg.inv(grid.T)
-    m1_max = int(np.ceil(radius * np.linalg.norm(cell_G[0, :]) + 0.5))
-    m2_max = int(np.ceil(radius * np.linalg.norm(cell_G[1, :]) + 0.5))
-    m3_max = int(np.ceil(radius * np.linalg.norm(cell_G[2, :]) + 0.5))
+    for i, l_i in enumerate(basis):
+        start_j = i if mode == "onsite" else 0
+        for j in range(start_j, num_basis):
+            l_j = basis[j]
 
-    m1_range = np.arange(-m1_max, m1_max)
-    m2_range = np.arange(-m2_max, m2_max)
-    m3_range = np.arange(-m3_max, m3_max)
+            if mode == "onsite":
+                block_start[i][j] = count
+                block_start[j][i] = count
+                interval = 2
+            elif mode == "offsite":
+                block_start[i][j] = count
+                interval = 1
 
-    M1, M2, M3 = np.meshgrid(m1_range, m2_range, m3_range, indexing="ij")
-    mask0_all = np.stack([M1.ravel(), M2.ravel(), M3.ravel()], axis=1)
-    edge_vec_all = np.dot(mask0_all, grid)
+            l_min = abs(l_j - l_i)
+            l_max = l_i + l_j
+            p = (-1) ** (l_max)
 
-    vecl_sq = np.sum(edge_vec_all**2, axis=1)
-    radius_sq = radius**2
-    mask = vecl_sq <= radius_sq
-
-    mask0 = mask0_all[mask]
-    edge_vec = edge_vec_all[mask]
-
-    # avoid NaN for r = 0
-    center_index = np.where(np.all(mask0 == 0, axis=1))[0]
-    edge_vec[center_index] += [0, 1e-6, 0]
-    return np.array(mask0), np.array(edge_vec)
+            for lmain in range(l_min, l_max + 1, interval):
+                irreps.append((1, (lmain, p)))
+                count += 2 * lmain + 1
+    len_tensor = count
+    return irreps, block_start, len_tensor

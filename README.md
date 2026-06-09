@@ -1,8 +1,6 @@
 # EdenGNN
 
-**EdenGNN** (Equivariant Density Graph Neural Network) is an E(3)-equivariant Graph Neural Network framework designed for accurate and efficient prediction of charge density and electronic structures directly from atomic configurations.
-
-You can run **EdenGNN** examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing). The trained model weights are stored at the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN), and example density files can be downloaded via this [link](https://huggingface.co/datasets/TrueSavage/EdenGNN-Data).
+**EdenGNN** (Equivariant Density Graph Neural Network) is an open framework for accurate and efficient charge density prediction. Integrated with DFT softwares, it can predict electronic structures directly from atomic configurations.
 
 ---
 
@@ -12,13 +10,15 @@ You can run **EdenGNN** examples directly in your browser using the Google Colab
   - [Data Preparation](#data-preparation)
   - [Training](#training)
   - [Prediction](#prediction)
+- [Pre-trained Models](#pre-trained-models)
 - [Troubleshooting](#troubleshooting)
-- [Universal Model](#universal-model)
 - [Citation](#citation)
 
 ---
 
 ## Features
+
+![workflow](./workflow.png)
 
 - **Bypassing the self-consistent calculations of the Kohn-Sham (KS) equations:** The predicted charge density can be used to construct the KS Hamiltonian and calculate the electronic structures.
 
@@ -27,40 +27,36 @@ You can run **EdenGNN** examples directly in your browser using the Google Colab
 
 ## Installation
 
-
-
-### Prerequisites
-
-Ensure you have the following dependencies installed in your python environment:
-
-- `torch`
-- `pytorch-geometric`
-- `e3nn`
-- `lightning`
-- `meson`
-- `vesin`
-
-### Install EdenGNN
-
-- Clone the repository and install it via `pip`:
+1. Clone the repository and install it via `pip`:
 
 ```bash
 git clone https://github.com/rubenlee11/EdenGNN.git
 cd EdenGNN
 pip install .
-# for offline installation, use:
-# pip install . --no-index --no-build-isolation
 ```
 
-- Performing non-self-consistent calculations in **OpenMX** with predicted charge density requires some modifications. Please compile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
+For offline installation, use:
+
+```bash
+pip install . --no-index --no-build-isolation
+```
+
+2. Prepare your DFT softwares.
+
+- For performing non-self-consistent calculations in **OpenMX** 3.9 with predicted charge density, you need to recompile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
+
+- For performing non-self-consistent calculations in **ABACUS** 3.10.0 with predicted difference charge density, you need to recompile **ABACUS** with the patch files provided in `./scripts/abacus/patch_deltarho`.
+
+- For performing non-self-consistent calculations in **SIESTA** with predicted difference charge density, you need to compile it with **NetCDF** support.
 
 ## Usage
 
+The best way to learn how to use **EdenGNN** is to run the examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing). Some trained model weights are stored at the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN), and example density files can be downloaded via this [link](https://huggingface.co/datasets/TrueSavage/EdenGNN-Data). Detailed parameter descriptions can be found in `config.yaml`.
+
+
 * **Important Note:** The following instructions are tailored for the VASP software using PAW pseudopotentials.
 
-* We highly recommend keeping all DFT calculation settings consistent across your dataset. Always use consistent pseudopotentials in the training and predicting stages. 
-
-A complete workflow example can be found in `examples/si`. You can also explore it interactively using the provided Jupyter Notebooks. Detailed parameter descriptions are available in the example `config.yaml` file.
+* We recommend keeping DFT calculation settings consistent across your dataset and workflow. For example, the pseudopotentials, the Brillouin zone sampling density for integration, and the energy cutoff for FFT grids.
 
 ### Data Preparation
 
@@ -162,6 +158,12 @@ python scripts/train.py --config path/to/config.yaml
 python scripts/train.py --config path/to/config.yaml
 ```
 
+## Pre-trained Models
+
+**EdenGNN-Uni** is a pre-trained universal charge density model trained on non-magnetic materials from the Materials Project database. 
+
+To use EdenGNN-Uni for predicting electronic structures, please ensure that your input structures use the **exact same PAW pseudopotential versions** as those used as the training set.
+
 ## Troubleshooting
 
 If you encounter with out of memory (OOM) errors when training or predicting the pseudo charge density, try the following solutions:
@@ -170,12 +172,6 @@ If you encounter with out of memory (OOM) errors when training or predicting the
 2. Decrease the maximum number of grids for structures in your training set.
 3. Reduce the number of channels: `model.probe.conv.n_channels`.
 4. In VASP, `PREC = Normal` is accurate enough for band structures. `PREC = Accurate` results denser grid and slows down training. 
-
-## Universal Model
-
-**EdenGNN-Uni** is a pre-trained universal charge density model trained on non-magnetic materials from the Materials Project database. 
-
-To use EdenGNN-Uni for predicting electronic structures, please ensure that your input structures use the **exact same PAW pseudopotential versions** as those used as the training set.
 
 ## Citation
 
