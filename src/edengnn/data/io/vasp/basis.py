@@ -5,11 +5,11 @@ search 'Non local Part' in POTCAR file to retrieve the basis dict
 
 """
 
-from edengnn.data.io.utils import init_basic_irreps
+from edengnn.data.io.utils import init_e3nn_irreps
 
 
 AUG_BASIS = [0, 0, 0, 1, 1, 2, 2, 3, 3]
-AUG_IRREPS, I1I2_IDX, LEN_AUG_TENSOR = init_basic_irreps(AUG_BASIS)
+AUG_IRREPS, I1I2_IDX, _, LEN_AUG_TENSOR = init_e3nn_irreps(AUG_BASIS)
 
 aug_basis_dict = {
     "Ac": [0, 0, 1, 1, 2, 2, 3, 3],  # 390 element
