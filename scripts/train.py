@@ -15,6 +15,9 @@ from edengnn.data.io.utils import RYDBERG
 
 colors = plt.cm.tab10.colors
 
+import time
+import functools
+
 
 class Model(L.LightningModule):
     """-------------------------------------------------------------------------
@@ -84,6 +87,13 @@ class Model(L.LightningModule):
                     self.loss_fn[self.loss_dict[key]["loss"]](
                         batch[key].flatten()[batch[key_mask]],
                         value.flatten()[batch[key_mask]],
+                    )
+                    * self.loss_dict[key]["weight_train"]
+                )
+            elif key == "total_charge":
+                loss += (
+                    self.loss_fn[self.loss_dict[key]["loss"]](
+                        batch["grid_func_out"].mean(), value
                     )
                     * self.loss_dict[key]["weight_train"]
                 )
@@ -279,6 +289,11 @@ class Model(L.LightningModule):
         return [optimizer], [scheduler]
 
     def _plot_parity(self):
+        if len(self.targets_aug) > 0 or len(self.targets_operator) > 0:
+            plot = True
+        else:
+            plot = False
+
         if len(self.targets_aug) > 0:
             preds = torch.cat(self.preds_aug)
             targets = torch.cat(self.targets_aug)
@@ -290,19 +305,20 @@ class Model(L.LightningModule):
             self.targets_operator = []
             self.preds_operator = []
 
-        plt.figure()
-        plt.plot(
-            [targets.min(), targets.max()],
-            [targets.min(), targets.max()],
-            color=colors[1],
-        )
-        plt.scatter(targets, preds, s=2, color=colors[0], zorder=10)
-        plt.xlabel("True")
-        plt.ylabel("Pred")
-        plt.title("Parity Plot")
-        img_path = os.path.join(self.save_dir, "parity_plot.png")
-        plt.savefig(img_path, dpi=300, bbox_inches="tight")
-        plt.close()
+        if plot:
+            plt.figure()
+            plt.plot(
+                [targets.min(), targets.max()],
+                [targets.min(), targets.max()],
+                color=colors[1],
+            )
+            plt.scatter(targets, preds, s=2, color=colors[0], zorder=10)
+            plt.xlabel("True")
+            plt.ylabel("Pred")
+            plt.title("Parity Plot")
+            img_path = os.path.join(self.save_dir, "parity_plot.png")
+            plt.savefig(img_path, dpi=300, bbox_inches="tight")
+            plt.close()
 
 
 def main():
@@ -418,12 +434,24 @@ def main():
                 stage=cfg.run.mode,
                 save_dir=save_dir,
                 prefix=cfg.data.abacus.prefix,
-                path_template=cfg.data.abacus.path_template,
                 ecutwfc=cfg.data.abacus.ecutwfc,
                 dk_bz=cfg.data.dk_bz,
                 dk_band=cfg.data.dk_band,
                 plot_band=cfg.data.plot_band,
             )
+    elif cfg.data.dft_software == "siesta":
+        from edengnn.data.io.siesta.parse_density import IO_Siesta
+
+        io_dft = IO_Siesta(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            prefix=cfg.data.siesta.prefix,
+            filename_out=cfg.data.siesta.filename_out,
+            meshcutoff=cfg.data.siesta.meshcutoff,
+            dk_bz=cfg.data.dk_bz,
+            dk_band=cfg.data.dk_band,
+            plot_band=cfg.data.plot_band,
+        )
 
     if cfg.run.mode == "train":
         train_loader = get_loader(cfg, stage="train", io_dft=io_dft)
@@ -477,11 +505,7 @@ def main():
             compile=cfg.model.compile,
             **cfg.optimize,
         )
-        # if cfg.run.mode == "test":
-        #    loader = get_loader(cfg, stage="test", io_dft=io_dft)
-        #    trainer.test(lightning_model, loader)
 
-        # elif cfg.run.mode == "predict":
         loader = get_loader(cfg, stage="predict", io_dft=io_dft)
 
         t_predict_start = time.time()
@@ -528,6 +552,17 @@ def main():
                     struct["z"],
                     struct["cell"],
                     struct["pos"],
+                    struct["density"],
+                )
+                tasks.append(task_args)
+                num_atom_total += struct["nat"]
+                num_pb_total += struct["npb"]
+
+        elif cfg.data.dft_software == "siesta":
+            for struct in predictions:
+                task_args = (
+                    struct["name"],
+                    struct["cell"],
                     struct["density"],
                 )
                 tasks.append(task_args)
