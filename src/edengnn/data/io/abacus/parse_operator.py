@@ -1,24 +1,17 @@
 import numpy as np
 import pathlib, os
 from edengnn.data.io.utils import BOHR
-from edengnn.data.io.abacus.pseudo import (
-    BASIS_INDEX_ABACUS2E3NN,
-    BASIS_INDEX_E3NN2ABACUS,
-    BASIS_SIZE,
-    BASIS_IRREPS,
-    BASIS_IDX,
-)
 
 
 class IO_Abacus_Operator:
-    def __init__(self, threshold=1e-7, unit=1.0):
+    def __init__(self, basis_cfg, threshold=1e-7, unit=1.0):
         """
         threshold:
             truncate blocks whose matrix elements are smaller than the threshold
         """
         self.threshold = threshold  # [unit]
         self.unit = unit
-        return None
+        self.basis_cfg = basis_cfg
 
     def read_data(self, path):
         """
@@ -66,16 +59,16 @@ class IO_Abacus_Operator:
                 iedge, jedge = _edge[:2]
                 shift = np.array(_edge[2:])
 
-                # reshape the operator block into (BASIS, BASIS)
+                # reshape the operator block into (size of basis, size of basis)
                 _data = array * self.unit
 
-                lis = BASIS_IRREPS[z[iedge]]
-                lis_idx = BASIS_IDX[z[iedge]]
-                ljs = BASIS_IRREPS[z[jedge]]
-                ljs_idx = BASIS_IDX[z[jedge]]
+                lis = self.basis_cfg.atom_irreps[z[iedge]]
+                lis_idx = self.basis_cfg.atom_irreps_idx[z[iedge]]
+                ljs = self.basis_cfg.atom_irreps[z[jedge]]
+                ljs_idx = self.basis_cfg.atom_irreps_idx[z[jedge]]
 
-                block = np.zeros((BASIS_SIZE, BASIS_SIZE))
-                block_mask = np.zeros((BASIS_SIZE, BASIS_SIZE))
+                block = np.zeros((self.basis_cfg.size, self.basis_cfg.size))
+                block_mask = np.zeros((self.basis_cfg.size, self.basis_cfg.size))
 
                 _idx_i = 0
                 for i, li in enumerate(lis):
@@ -112,12 +105,12 @@ class IO_Abacus_Operator:
         operator_onsite = np.stack(operator_onsite)
         operator_onsite_mask = np.stack(operator_onsite_mask)
         # change index
-        operator_onsite = operator_onsite[:, BASIS_INDEX_ABACUS2E3NN, :][
-            :, :, BASIS_INDEX_ABACUS2E3NN
+        operator_onsite = operator_onsite[:, self.basis_cfg.index_dft2e3nn, :][
+            :, :, self.basis_cfg.index_dft2e3nn
         ]
-        operator_onsite_mask = operator_onsite_mask[:, BASIS_INDEX_ABACUS2E3NN, :][
-            :, :, BASIS_INDEX_ABACUS2E3NN
-        ]
+        operator_onsite_mask = operator_onsite_mask[
+            :, self.basis_cfg.index_dft2e3nn, :
+        ][:, :, self.basis_cfg.index_dft2e3nn]
         # sort onsite blocks
         onsite_index = np.array(onsite_index)
         _onsite_index = np.arange(len(onsite_index))
@@ -132,13 +125,12 @@ class IO_Abacus_Operator:
         operator_offsite = np.stack(operator_offsite)
         operator_offsite_mask = np.stack(operator_offsite_mask)
         # change index
-        operator_offsite = operator_offsite[:, BASIS_INDEX_ABACUS2E3NN, :][
-            :, :, BASIS_INDEX_ABACUS2E3NN
+        operator_offsite = operator_offsite[:, self.basis_cfg.index_dft2e3nn, :][
+            :, :, self.basis_cfg.index_dft2e3nn
         ]
-        operator_offsite_mask = operator_offsite_mask[:, BASIS_INDEX_ABACUS2E3NN, :][
-            :, :, BASIS_INDEX_ABACUS2E3NN
-        ]
-        operator_offsite_mask.fill(0)
+        operator_offsite_mask = operator_offsite_mask[
+            :, self.basis_cfg.index_dft2e3nn, :
+        ][:, :, self.basis_cfg.index_dft2e3nn]
 
         # calculate cell shift vectors
         nbr_shift = cell_shift @ cell

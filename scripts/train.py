@@ -15,9 +15,6 @@ from edengnn.data.io.utils import RYDBERG
 
 colors = plt.cm.tab10.colors
 
-import time
-import functools
-
 
 class Model(L.LightningModule):
     """-------------------------------------------------------------------------
@@ -356,7 +353,10 @@ def main():
 
     logger.info("[Init] Building model...")
     if cfg.run.task == 3:
-        model = HermitianOperator(cfg.model).to(DTYPE)
+        from edengnn.data.io.abacus.pseudo import build_basis
+
+        basis_cfg = build_basis(cfg.model.operator.basis)
+        model = HermitianOperator(basis_cfg, cfg.model).to(DTYPE)
     else:
         model = EfficientDensity(cfg.model).to(DTYPE)
     logger.info("%s", OmegaConf.to_yaml(cfg.model))
@@ -426,7 +426,9 @@ def main():
         if cfg.run.task == 3:
             from edengnn.data.io.abacus.parse_operator import IO_Abacus_Operator
 
-            io_dft = IO_Abacus_Operator(threshold=1e-5 / RYDBERG, unit=RYDBERG)
+            io_dft = IO_Abacus_Operator(
+                basis_cfg, threshold=1e-5 / RYDBERG, unit=RYDBERG
+            )
         else:
             from edengnn.data.io.abacus.parse_density import IO_Abacus
 

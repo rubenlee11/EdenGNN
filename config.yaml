@@ -112,7 +112,7 @@ data:
   path_val: # sacd paths of working directories
 
   # [check predict] txt files storing the input SAD CHGCAR paths for inference
-  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+  path_predict:
 
   # [default]
   num_workers: 4
@@ -264,6 +264,7 @@ model:
       # [default] the number of radial basis for each angular quantum number.
       n_channels: 4 
   operator:
+    basis: [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 3, 3, 4]
     onsite:
       n_channels: 4
     offsite:
