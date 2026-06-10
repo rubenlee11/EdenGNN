@@ -1,5 +1,6 @@
 from edengnn.data.io.utils import init_e3nn_irreps, BasisConfig
-import sys
+import sys, re
+from pymatgen.core import Element
 
 PP_dict = {
     "Hf": "Hf.upf",
@@ -146,12 +147,30 @@ BASIS_dict = {
 
 
 # basis_irreps stores the angular momentum quantum numbers
-BASIS_IRREPS = {
-    1: [0, 0, 1],  # H
-    14: [0, 0, 1, 1, 2],  # Si
-    31: [0, 0, 1, 1, 2, 2, 3],  # Ga
-    33: [0, 0, 1, 1, 2],  # As
-}
+# BASIS_IRREPS = {
+#    1: [0, 0, 1],  # H
+#    14: [0, 0, 1, 1, 2],  # Si
+#    31: [0, 0, 1, 1, 2, 2, 3],  # Ga
+#    33: [0, 0, 1, 1, 2],  # As
+# }
+L_MAP = {"s": 0, "p": 1, "d": 2, "f": 3, "g": 4}
+BASIS_IRREPS = {}
+for element, filename in BASIS_dict.items():
+    # Get atomic number using pymatgen
+    z = Element(element).Z
+
+    # Extract orbital configuration string
+    orb_part = filename.split("_")[-1].split(".")[0]
+
+    # Parse counts and orbital types
+    matches = re.findall(r"(\d+)([spdfg])", orb_part)
+
+    # Generate the list of angular momentum quantum numbers
+    irreps = []
+    for count_str, l_str in matches:
+        irreps.extend([L_MAP[l_str]] * int(count_str))
+
+    BASIS_IRREPS[z] = irreps
 
 
 def build_basis(basis):

@@ -56,7 +56,7 @@ The best way to learn how to use **EdenGNN** is to run the examples directly in 
 
 * **Important Note:** The following instructions are tailored for the VASP software using PAW pseudopotentials.
 
-* We recommend keeping DFT calculation settings consistent across your dataset and workflow. For example, the pseudopotentials, the Brillouin zone sampling density for integration, and the energy cutoff for FFT grids.
+* DFT calculation settings, for example, the pseudopotentials, the Brillouin zone sampling density for integration, and the energy cutoff for FFT grids, should be consistent across your dataset and workflow. 
 
 ### Data Preparation
 
@@ -107,8 +107,6 @@ Example:
 
 Modify your configuration file with the following key settings:
 
-- **Set `run.mode` to `train`.** 
-
 - **Set `run.task`:**
   - `0`: Train the pseudo charge density.
   - `1` Train the augmentation occupancies.
@@ -134,14 +132,12 @@ Modify your configuration file with the following key settings:
 
 #### 2. Start Training
 ```bash
-python scripts/train.py --config path/to/config.yaml
+edengnn-train --config path/to/config.yaml
 ```
 
 ### Prediction
 
 #### 1. Configure `config.yaml`
-
-- **Set `run.mode: predict`**.
 
 - **Set `data.dft_software`**.
 
@@ -155,7 +151,7 @@ python scripts/train.py --config path/to/config.yaml
 
 #### 2. Run Prediction
 ```bash
-python scripts/train.py --config path/to/config.yaml
+edengnn-predict --config path/to/config.yaml
 ```
 
 ## Pre-trained Models
