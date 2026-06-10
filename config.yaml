@@ -20,7 +20,7 @@ run:
   # [default] Hardware device for computation. Options: "cpu", "cuda:0", etc.
   device: cuda:0       
 
-  # [default] Number of GPUs to use for distributed training. Experimental usage.
+  # [default] Number of GPUs to use for data distributed training. Experimental usage.
   num_gpus: 1      
 
   # [check] "train" or "predict"        
