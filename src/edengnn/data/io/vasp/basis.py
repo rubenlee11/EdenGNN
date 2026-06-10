@@ -5,41 +5,11 @@ search 'Non local Part' in POTCAR file to retrieve the basis dict
 
 """
 
-
-def init_basic_irreps(basis):
-    basic_irreps = []
-    num_basis = len(basis)
-    I1I2_IDX = [
-        [0] * num_basis for _ in range(num_basis)
-    ]  # map from basis index to irreps tensor start position
-
-    count = 0
-
-    for i, l_i in enumerate(basis):
-        for j_, l_j in enumerate(basis[i:]):
-            j = i + j_
-            I1I2_IDX[i][j] = count
-            I1I2_IDX[j][i] = count
-
-            l_min = abs(l_j - l_i)
-            l_max = abs(l_i + l_j)
-
-            parity = (l_i + l_j) % 2
-            if parity == 0:
-                p = 1
-            elif parity == 1:
-                p = -1
-            else:
-                raise NotImplementedError
-            for lmain in range(l_min, l_max + 1, 2):
-                basic_irreps.append((1, (lmain, p)))
-                count += 2 * lmain + 1
-    len_tensor = count
-    return basic_irreps, I1I2_IDX, len_tensor
+from edengnn.data.io.utils import init_e3nn_irreps
 
 
 AUG_BASIS = [0, 0, 0, 1, 1, 2, 2, 3, 3]
-AUG_IRREPS, I1I2_IDX, LEN_AUG_TENSOR = init_basic_irreps(AUG_BASIS)
+AUG_IRREPS, I1I2_IDX, _, LEN_AUG_TENSOR = init_e3nn_irreps(AUG_BASIS)
 
 aug_basis_dict = {
     "Ac": [0, 0, 1, 1, 2, 2, 3, 3],  # 390 element

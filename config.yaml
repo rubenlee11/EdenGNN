@@ -26,7 +26,7 @@ run:
   # [check] "train" or "predict"        
   mode: predict       
 
-  # [check] Task type. 0: density; 1: augmentation; 2: density & augmentation. Must match ckpt if any.      
+  # [check] Task type. 0: density; 1: augmentation; 2: density & augmentation; 3: hamiltonian. Must match ckpt if any.
   task: 0          
 
   # [check] Wandb project     
@@ -112,7 +112,7 @@ data:
   path_val: # sacd paths of working directories
 
   # [check predict] txt files storing the input SAD CHGCAR paths for inference
-  path_predict: /root/dataset/molecular_dynamics/gan/dataset_debug.txt
+  path_predict:
 
   # [default]
   num_workers: 4
@@ -138,9 +138,13 @@ optimize:
       loss: "L1"
     # this is deprecated. total charge errors are logged during training
     total_charge:
-      weight_train: 0.0
+      #weight_train: 0.0 # deprecated
       weight_val: 0.0
       loss: "L2"
+    operator:
+      weight_train: 1.0
+      weight_val: 1.0
+      loss: "L1"
 
   # [check train]
   lr: 0.005
@@ -177,13 +181,14 @@ optimize:
       beta1: 0.99
       beta2: 0.999
 
-  # [default] 0 default; 1 for debug 
-  log_level: 0
+  # [default] 0 default; 1 for debug. deprecated
+  # log_level: 0
 
   # [default]
   gradient_clip_val: 0.0    
 
 model:
+  compile: True
   task: ${run.task}
   lmix_max: ${data.vasp.lmix_max}
 
@@ -258,6 +263,15 @@ model:
 
       # [default] the number of radial basis for each angular quantum number.
       n_channels: 4 
+  operator:
+    basis: [0, 0, 1, 1, 2, 2, 3]
+    offsite:
+      cutoff: 12.0
+      n_radial_basis: 8
+      num_radial_filter_layers: 2
+      num_radial_filter_neurons: 64
+
+
 
 wandb:
   project: ${run.project}
