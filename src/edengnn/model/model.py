@@ -14,6 +14,7 @@ from .nequip.nn import (
 )
 from .nequip.nn.nonlinearities import ShiftedSoftPlus
 from edengnn.data.io.vasp.basis import AUG_IRREPS
+from edengnn.model.utils.cg import ClebschGordan
 
 
 class DensityLayer(torch.nn.Module):
@@ -117,7 +118,7 @@ class DensityLayer(torch.nn.Module):
 
     def reshape_irreps(self, tensor):
         """---------------------------------------------------------------------
-        change irreps from e3nn form [c * l1 + c8 l2 + ...] to [c][l1+l2+...]
+        change irreps from e3nn form [c * l1 + c * l2 + ...] to [c][l1+l2+...]
         ---------------------------------------------------------------------"""
         shape = tensor.shape
         tensor_flat = tensor.reshape(-1, shape[-1])
@@ -292,6 +293,157 @@ class AugmentationLayer(torch.nn.Module):
         self.conv_to_output_node(data)
 
 
+class OperatorOnsiteLayer(torch.nn.Module):
+    def __init__(
+        self,
+        irreps_node_features,
+        irreps_out,
+    ):
+        super().__init__()
+        # conv node feature to output
+        self.conv_to_output_node = AtomwiseLinear(
+            out_field="node_operator_onsite",
+            irreps_in={
+                AtomicDataDict.NODE_FEATURES_KEY: e3nn.o3.Irreps(irreps_node_features)
+            },
+            irreps_out=e3nn.o3.Irreps(irreps_out),
+        )
+
+    def forward(self, data):
+        self.conv_to_output_node(data)
+
+
+class OperatorOffsiteLayer(torch.nn.Module):
+    def __init__(
+        self,
+        irreps_node_features,
+        cutoff,
+        basis_cfg,
+        n_radial_basis,
+        num_radial_filter_layers,
+        num_radial_filter_neurons,
+    ):
+        super().__init__()
+
+        self.basis_cfg = basis_cfg
+        irreps_out = e3nn.o3.Irreps(self.basis_cfg.irreps_offsite)
+
+        # offsite operator transpose index and coefficient.
+        index_tensor = torch.empty(self.basis_cfg.size_offsite, dtype=torch.long)
+        index_tensor_original = torch.arange(
+            self.basis_cfg.size_offsite, dtype=torch.long
+        )
+        coeff = torch.empty(self.basis_cfg.size_offsite)
+
+        for i, l_i in enumerate(self.basis_cfg.basis):
+            for j, l_j in enumerate(self.basis_cfg.basis):
+                block_len = self.basis_cfg.i1i2_size_offsite[i][j]
+                start_ij = self.basis_cfg.i1i2_start_offsite[i][j]
+                start_ji = self.basis_cfg.i1i2_start_offsite[j][i]
+
+                # Map the block from (i, j) to (j, i)
+                index_tensor[start_ji : start_ji + block_len] = index_tensor_original[
+                    start_ij : start_ij + block_len
+                ]
+
+                lmin = abs(l_i - l_j)
+                lmax = l_i + l_j
+                count = 0
+                for l_main in range(lmin, lmax + 1):
+                    coeff[start_ji + count : start_ji + count + 2 * l_main + 1] = (
+                        -1
+                    ) ** (l_i + l_j - l_main)
+                    count += 2 * l_main + 1
+
+        self.register_buffer("transpose_index", index_tensor)
+        self.register_buffer("transpose_coeff", coeff)
+
+        irreps_node_features = e3nn.o3.Irreps(irreps_node_features)
+        self.linear_1 = e3nn.o3.Linear(
+            irreps_in=irreps_node_features,
+            irreps_out=irreps_node_features,
+        )
+
+        # tensor product
+        irreps_out = e3nn.o3.Irreps(irreps_out)
+        irreps_edge_attr = [
+            (1, (l, -1)) if l % 2 else (1, (l, 1))
+            for l in range(self.basis_cfg.l_max * 2 + 1)
+        ]
+        irreps_mid = []
+        instructions = []
+        for i, (mul, ir_in) in enumerate(irreps_node_features):
+            for j, (_, ir_edge) in enumerate(irreps_edge_attr):
+                for ir_out in ir_in * ir_edge:
+                    if ir_out in irreps_out:
+                        k = len(irreps_mid)
+                        irreps_mid.append((mul, ir_out))
+                        instructions.append((i, j, k, "uvu", True))
+
+        self.tp = e3nn.o3.TensorProduct(
+            irreps_node_features,
+            irreps_edge_attr,
+            irreps_mid,
+            instructions,
+            shared_weights=False,
+            internal_weights=False,
+        )
+
+        # edge embedding
+        self.coord_change = torch.LongTensor([1, 2, 0])
+        self.spharm_edges = e3nn.o3.SphericalHarmonics(
+            irreps_out=e3nn.o3.Irreps(irreps_edge_attr),
+            normalization="component",
+            normalize=True,
+        )
+
+        self.radial_basis = BesselBasis(
+            cutoff=cutoff,
+            n_rbf=n_radial_basis,
+            cutoff_func=CosineCutoff(cutoff=cutoff),
+        )
+
+        # radial filters
+        self.edge_net = e3nn.nn.FullyConnectedNet(
+            [n_radial_basis]
+            + num_radial_filter_layers * [num_radial_filter_neurons]
+            + [self.tp.weight_numel],
+            ShiftedSoftPlus,
+        )
+
+        self.linear_2 = e3nn.o3.Linear(
+            irreps_in=e3nn.o3.Irreps(irreps_mid),
+            irreps_out=irreps_out,
+        )
+
+    def forward(self, data):
+        node_features = self.linear_1(data["node_features"])
+        # geometric information
+        operator_edge_length = torch.linalg.norm(data["edge_vec_operator"], dim=-1)
+        operator_edge = data["edge_vec_operator"][:, self.coord_change]
+        operator_edge_embedding = self.radial_basis(operator_edge_length)
+
+        Y_lm = self.spharm_edges(operator_edge)
+        _Y_lm = self.spharm_edges(-operator_edge)
+        iedge = data["edge_index_operator"][0, :]
+        jedge = data["edge_index_operator"][1, :]
+
+        edge_features = node_features[iedge] + node_features[jedge]
+
+        # hermitian tensor product
+        weight = self.edge_net(operator_edge_embedding)
+        edge_tensors = self.tp(edge_features, Y_lm, weight)
+        edge_tensors = self.linear_2(edge_tensors)
+
+        _edge_tensors = self.tp(edge_features, _Y_lm, weight)
+        _edge_tensors = self.linear_2(_edge_tensors)
+
+        data["node_operator_offsite"] = 0.5 * (
+            edge_tensors
+            + (_edge_tensors[..., self.transpose_index]) * self.transpose_coeff
+        )
+
+
 class Encoder(torch.nn.Module):
     """
     See NequIP
@@ -450,3 +602,112 @@ class EfficientDensity(torch.nn.Module):
                 self._cal_density(data, output)
 
         return output
+
+
+class HermitianOperator(torch.nn.Module):
+    def __init__(self, basis_cfg, config):
+        super().__init__()
+        self.basis_cfg = basis_cfg
+
+        self.cg_cal = ClebschGordan()
+        self.representation = Encoder(
+            cutoff=config.atom.edge.cutoff,
+            l_max=config.atom.l_max,
+            num_types=config.atom.num_types,
+            n_radial_basis=config.atom.edge.n_radial_basis,
+            irreps_node_features=config.atom.conv.irreps_node_features,
+            num_conv_layers=config.atom.conv.num_conv_layers,
+            num_radial_filter_layers=config.atom.conv.num_radial_filter_layers,
+            num_radial_filter_neurons=config.atom.conv.num_radial_filter_neurons,
+        )
+        self.onsite = OperatorOnsiteLayer(
+            irreps_out=self.basis_cfg.irreps_onsite,
+            irreps_node_features=config.atom.conv.irreps_node_features,
+        )
+        self.offsite = OperatorOffsiteLayer(
+            irreps_node_features=config.atom.conv.irreps_node_features,
+            cutoff=config.operator.offsite.cutoff,
+            basis_cfg=basis_cfg,
+            n_radial_basis=config.operator.offsite.n_radial_basis,
+            num_radial_filter_layers=config.operator.offsite.num_radial_filter_layers,
+            num_radial_filter_neurons=config.operator.offsite.num_radial_filter_neurons,
+        )
+
+    def sum2product(self, l1, l2, tensor_sum, mode="onsite"):
+        dtype = tensor_sum.dtype
+        device = tensor_sum.device
+        l_min = abs(l2 - l1)
+        l_max = l1 + l2
+        tensor_product = torch.zeros(
+            (len(tensor_sum), 2 * l1 + 1, 2 * l2 + 1), dtype=dtype, device=device
+        )
+
+        idx_element = 0
+        if mode == "onsite":
+            interval = 2
+        elif mode == "offsite":
+            interval = 1
+        for lmain in range(l_min, l_max + 1, interval):
+            tensor_irreps = tensor_sum[:, idx_element : idx_element + 2 * lmain + 1]
+            # this 2L+1 coefficient is due to e3nn's convention
+            cg = self.cg_cal(l1, l2, lmain) * (2 * lmain + 1)
+            tensor_product += torch.einsum("ijk, mk->mij", cg, tensor_irreps)
+            idx_element += 2 * lmain + 1
+
+        return tensor_product
+
+    def forward(self, data, batch=None):
+        self.representation(data)
+        self.onsite(data)
+        self.offsite(data)
+
+        device = data["pos"].device
+        dtype = data["pos"].dtype
+        #
+        # transform irreps to operator
+        #
+        n_atom = len(data["z"])
+        n_edge = len(data["edge_vec_operator"])
+        operator_onsite = torch.zeros(
+            (n_atom, self.basis_cfg.size, self.basis_cfg.size),
+            device=device,
+            dtype=dtype,
+        )
+        operator_offsite = torch.zeros(
+            (n_edge, self.basis_cfg.size, self.basis_cfg.size),
+            device=device,
+            dtype=dtype,
+        )
+        for i, l_i in enumerate(self.basis_cfg.basis):
+            for j, l_j in enumerate(self.basis_cfg.basis):
+                istart_i = self.basis_cfg.basis_start[i]
+                istart_j = self.basis_cfg.basis_start[j]
+
+                operator_onsite[
+                    :,
+                    istart_i : istart_i + 2 * l_i + 1,
+                    istart_j : istart_j + 2 * l_j + 1,
+                ] = self.sum2product(
+                    l_i,
+                    l_j,
+                    data["node_operator_onsite"][
+                        :, self.basis_cfg.i1i2_start_onsite[i][j] :
+                    ],
+                    mode="onsite",
+                )
+                operator_offsite[
+                    :,
+                    istart_i : istart_i + 2 * l_i + 1,
+                    istart_j : istart_j + 2 * l_j + 1,
+                ] = self.sum2product(
+                    l_i,
+                    l_j,
+                    data["node_operator_offsite"][
+                        :, self.basis_cfg.i1i2_start_offsite[i][j] :
+                    ],
+                    mode="offsite",
+                )
+
+        return {
+            "operator": torch.concatenate([operator_onsite, operator_offsite]),
+        }
