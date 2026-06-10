@@ -12,7 +12,8 @@ class ClebschGordan(torch.nn.Module):
         super(ClebschGordan, self).__init__()
         tmp = np.load(
             os.path.join(
-                "/root/research/ml_hybrid_functional/EdenGNN-hybrid/src/edengnn/model/utils/clebsch_gordan_coefficients_L10.npz"
+                os.path.dirname(os.path.abspath(__file__)),
+                "clebsch_gordan_coefficients_L10.npz",
             ),
             allow_pickle=True,
         )["cg"][()]
