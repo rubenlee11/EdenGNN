@@ -368,7 +368,7 @@ class OperatorOffsiteLayer(torch.nn.Module):
         irreps_out = e3nn.o3.Irreps(irreps_out)
         irreps_edge_attr = [
             (1, (l, -1)) if l % 2 else (1, (l, 1))
-            for l in range(self.basis_cfg.l_max + 1)
+            for l in range(self.basis_cfg.l_max * 2 + 1)
         ]
         irreps_mid = []
         instructions = []
@@ -392,12 +392,7 @@ class OperatorOffsiteLayer(torch.nn.Module):
         # edge embedding
         self.coord_change = torch.LongTensor([1, 2, 0])
         self.spharm_edges = e3nn.o3.SphericalHarmonics(
-            irreps_out=e3nn.o3.Irreps(
-                [
-                    (1, (l, -1)) if l % 2 else (1, (l, 1))
-                    for l in range(self.basis_cfg.l_max * 2 + 1)
-                ]
-            ),
+            irreps_out=e3nn.o3.Irreps(irreps_edge_attr),
             normalization="component",
             normalize=True,
         )

@@ -158,6 +158,10 @@ class BasisConfig:
         Index which transforms the order of magnetic quantum number of
         DFT convention into that of e3nn.
 
+    phase_dft2e3nn: list of int
+        Phase which transforms the real spherical harmonics convention of
+        DFT into that of e3nn.
+
     index_e3nn2dft: list of int
         Inverse of ``index_dft2e3nn``.
 
@@ -187,6 +191,7 @@ class BasisConfig:
     i1i2_size_offsite: int = None
     # index change
     index_dft2e3nn: List[int] = None
+    phase_dft2e3nn: List[int] = None
     index_e3nn2dft: List[int] = None
     # basis dict
     atom_irreps: Any = None
