@@ -188,7 +188,7 @@ optimize:
   gradient_clip_val: 0.0    
 
 model:
-  compile: True
+  compile: False
   task: ${run.task}
   lmix_max: ${data.vasp.lmix_max}
 
