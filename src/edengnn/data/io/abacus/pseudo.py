@@ -174,13 +174,17 @@ def build_basis(basis):
     )
 
     index_dft2e3nn = []
+    phase_dft2e3nn = []
     count_m = 0
     for l in basis:
         for m in range(l):
             index_dft2e3nn.append(count_m + 2 * l - 2 * m)
+            phase_dft2e3nn.append((-1) ** abs(-l + m))
         index_dft2e3nn.append(count_m)
+        phase_dft2e3nn.append(1)
         for m in range(l):
             index_dft2e3nn.append(count_m + 2 * m + 1)
+            phase_dft2e3nn.append((-1) ** abs(m + 1))
         count_m += 2 * l + 1
 
     index_e3nn2dft = []
@@ -228,6 +232,7 @@ def build_basis(basis):
         size_offsite=size_offsite,
         i1i2_size_offsite=i1i2_size_offsite,
         index_dft2e3nn=index_dft2e3nn,
+        phase_dft2e3nn=phase_dft2e3nn,
         index_e3nn2dft=index_e3nn2dft,
         atom_irreps=atom_irreps,
         atom_irreps_idx=atom_irreps_idx,

@@ -108,6 +108,10 @@ class IO_Abacus_Operator:
         operator_onsite = operator_onsite[:, self.basis_cfg.index_dft2e3nn, :][
             :, :, self.basis_cfg.index_dft2e3nn
         ]
+        phase = np.asarray(self.basis_cfg.phase_dft2e3nn)
+        operator_onsite = (
+            operator_onsite * phase[None, :, None] * phase[None, None, :]
+        )
         operator_onsite_mask = operator_onsite_mask[
             :, self.basis_cfg.index_dft2e3nn, :
         ][:, :, self.basis_cfg.index_dft2e3nn]
@@ -128,6 +132,9 @@ class IO_Abacus_Operator:
         operator_offsite = operator_offsite[:, self.basis_cfg.index_dft2e3nn, :][
             :, :, self.basis_cfg.index_dft2e3nn
         ]
+        operator_offsite = (
+            operator_offsite * phase[None, :, None] * phase[None, None, :]
+        )
         operator_offsite_mask = operator_offsite_mask[
             :, self.basis_cfg.index_dft2e3nn, :
         ][:, :, self.basis_cfg.index_dft2e3nn]
