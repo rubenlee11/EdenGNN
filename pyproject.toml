@@ -27,6 +27,7 @@ dependencies = [
     "tqdm",
     "vesin",
     "wandb",
+    "scikit-learn", # delete in the future
 ]
 description = "EdenGNN: An Efficient E(3)-Equivariant Graph Neural Network for Charge Density Prediction"
 
