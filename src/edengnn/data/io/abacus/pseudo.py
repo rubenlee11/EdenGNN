@@ -147,12 +147,13 @@ BASIS_dict = {
 
 
 # basis_irreps stores the angular momentum quantum numbers
-# BASIS_IRREPS = {
-#    1: [0, 0, 1],  # H
-#    14: [0, 0, 1, 1, 2],  # Si
-#    31: [0, 0, 1, 1, 2, 2, 3],  # Ga
-#    33: [0, 0, 1, 1, 2],  # As
-# }
+BASIS_IRREPS = {
+1: [0, 0, 1],  # H
+14: [0, 0, 1, 1, 2],  # Si
+31: [0, 0, 1, 1, 2, 2, 3],  # Ga
+33: [0, 0, 1, 1, 2],  # As
+}
+"""
 L_MAP = {"s": 0, "p": 1, "d": 2, "f": 3, "g": 4}
 BASIS_IRREPS = {}
 for element, filename in BASIS_dict.items():
@@ -171,7 +172,7 @@ for element, filename in BASIS_dict.items():
         irreps.extend([L_MAP[l_str]] * int(count_str))
 
     BASIS_IRREPS[z] = irreps
-
+"""
 
 def build_basis(basis):
     # Check if BASIS is sorted in ascending order
