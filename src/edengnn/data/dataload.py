@@ -263,7 +263,6 @@ class OperatorDataset(torch.utils.data.Dataset):
             pos,
             edge_index_operator,
             edge_vec_operator,
-            nbr_shift_operator,
             operator,
             operator_mask,
         ) = self.io_dft.read_data(path)
@@ -286,6 +285,5 @@ class OperatorDataset(torch.utils.data.Dataset):
             operator_mask=torch.LongTensor(operator_mask).bool().flatten(),
             edge_index_operator=torch.LongTensor(edge_index_operator.T),
             edge_vec_operator=torch.tensor(edge_vec_operator, dtype=self.dtype),
-            nbr_shift_operator=torch.tensor(nbr_shift_operator, dtype=self.dtype),
             name=name,
         )

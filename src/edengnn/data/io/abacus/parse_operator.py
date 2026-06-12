@@ -137,12 +137,10 @@ class IO_Abacus_Operator:
             :, self.basis_cfg.index_dft2e3nn, :
         ][:, :, self.basis_cfg.index_dft2e3nn]
 
-        # calculate cell shift vectors
-        nbr_shift = cell_shift @ cell
         # calculate edge vectors
         i = edge_index[:, 0]
         j = edge_index[:, 1]
-        edge_vec = pos[j] - pos[i] + nbr_shift
+        edge_vec = pos[j] - pos[i] + cell_shift @ cell
 
         # concatenate operator
         operator = np.concatenate([operator_onsite, operator_offsite])
@@ -155,7 +153,6 @@ class IO_Abacus_Operator:
             pos,
             edge_index,
             edge_vec,
-            nbr_shift,
             operator,
             operator_mask,
         )
