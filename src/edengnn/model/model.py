@@ -370,6 +370,11 @@ class OperatorOffsiteLayer(torch.nn.Module):
             (1, (l, -1)) if l % 2 else (1, (l, 1))
             for l in range(self.basis_cfg.l_max * 2 + 1)
         ]
+        edge_sh_parity = []
+        for mul, (l, _) in irreps_edge_attr:
+            edge_sh_parity.extend([(-1.0) ** l] * mul * (2 * l + 1))
+        self.register_buffer("edge_sh_parity", torch.tensor(edge_sh_parity))
+
         irreps_mid = []
         instructions = []
         for i, (mul, ir_in) in enumerate(irreps_node_features):
@@ -424,7 +429,7 @@ class OperatorOffsiteLayer(torch.nn.Module):
         operator_edge_embedding = self.radial_basis(operator_edge_length)
 
         Y_lm = self.spharm_edges(operator_edge)
-        _Y_lm = self.spharm_edges(-operator_edge)
+        _Y_lm = Y_lm * self.edge_sh_parity
         iedge = data["edge_index_operator"][0, :]
         jedge = data["edge_index_operator"][1, :]
 
@@ -633,14 +638,9 @@ class HermitianOperator(torch.nn.Module):
             num_radial_filter_neurons=config.operator.offsite.num_radial_filter_neurons,
         )
 
-    def sum2product(self, l1, l2, tensor_sum, mode="onsite"):
-        dtype = tensor_sum.dtype
-        device = tensor_sum.device
+    def sum2product(self, l1, l2, opeartor_irreps, operator_block, mode="onsite"):
         l_min = abs(l2 - l1)
         l_max = l1 + l2
-        tensor_product = torch.zeros(
-            (len(tensor_sum), 2 * l1 + 1, 2 * l2 + 1), dtype=dtype, device=device
-        )
 
         idx_element = 0
         if mode == "onsite":
@@ -648,13 +648,16 @@ class HermitianOperator(torch.nn.Module):
         elif mode == "offsite":
             interval = 1
         for lmain in range(l_min, l_max + 1, interval):
-            tensor_irreps = tensor_sum[:, idx_element : idx_element + 2 * lmain + 1]
             # this 2L+1 coefficient is due to e3nn's convention
             cg = self.cg_cal(l1, l2, lmain) * (2 * lmain + 1)
-            tensor_product += torch.einsum("ijk, mk->mij", cg, tensor_irreps)
+            operator_block += torch.einsum(
+                "ijk, mk->mij",
+                cg,
+                opeartor_irreps[:, idx_element : idx_element + 2 * lmain + 1],
+            )
             idx_element += 2 * lmain + 1
 
-        return tensor_product
+        return
 
     def forward(self, data, batch=None):
         self.representation(data)
@@ -683,27 +686,29 @@ class HermitianOperator(torch.nn.Module):
                 istart_i = self.basis_cfg.basis_start[i]
                 istart_j = self.basis_cfg.basis_start[j]
 
-                operator_onsite[
-                    :,
-                    istart_i : istart_i + 2 * l_i + 1,
-                    istart_j : istart_j + 2 * l_j + 1,
-                ] = self.sum2product(
+                self.sum2product(
                     l_i,
                     l_j,
                     data["node_operator_onsite"][
                         :, self.basis_cfg.i1i2_start_onsite[i][j] :
                     ],
+                    operator_onsite[
+                        :,
+                        istart_i : istart_i + 2 * l_i + 1,
+                        istart_j : istart_j + 2 * l_j + 1,
+                    ],
                     mode="onsite",
                 )
-                operator_offsite[
-                    :,
-                    istart_i : istart_i + 2 * l_i + 1,
-                    istart_j : istart_j + 2 * l_j + 1,
-                ] = self.sum2product(
+                self.sum2product(
                     l_i,
                     l_j,
                     data["node_operator_offsite"][
                         :, self.basis_cfg.i1i2_start_offsite[i][j] :
+                    ],
+                    operator_offsite[
+                        :,
+                        istart_i : istart_i + 2 * l_i + 1,
+                        istart_j : istart_j + 2 * l_j + 1,
                     ],
                     mode="offsite",
                 )

@@ -136,8 +136,10 @@ class Model(L.LightningModule):
                 tar = batch[key].flatten()[batch["operator_mask"]]
                 pre = value.flatten()[batch["operator_mask"]]
                 losses[key] = self.loss_fn["L1"](tar, pre)
-                self.targets_operator.append(tar.detach().cpu())
-                self.preds_operator.append(pre.detach().cpu())
+                n_plot = min(20 * len(batch["operator_mask"]), tar.numel())
+                plot_idx = torch.randperm(tar.numel(), device=tar.device)[:n_plot]
+                self.targets_operator.append(tar[plot_idx].detach().cpu())
+                self.preds_operator.append(pre[plot_idx].detach().cpu())
             elif key == "total_charge":
                 losses[key] = (
                     self.loss_fn["L1"](value, batch["grid_func_out"].mean())
