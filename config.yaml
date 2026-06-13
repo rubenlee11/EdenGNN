@@ -266,6 +266,7 @@ model:
   operator:
     basis: [0, 0, 1, 1, 2, 2, 3]
     offsite:
+      symmetrize: False
       cutoff: 12.0
       n_radial_basis: 8
       num_radial_filter_layers: 2

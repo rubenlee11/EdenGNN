@@ -263,8 +263,10 @@ class OperatorDataset(torch.utils.data.Dataset):
             pos,
             edge_index_operator,
             edge_vec_operator,
-            operator,
-            operator_mask,
+            operator_onsite,
+            operator_onsite_mask,
+            operator_offsite,
+            operator_offsite_mask,
         ) = self.io_dft.read_data(path)
 
         # use vesin to determin the neighbor list
@@ -281,8 +283,14 @@ class OperatorDataset(torch.utils.data.Dataset):
             edge_index=torch.LongTensor(edge_index_atoms.T),
             edge_vec_atoms=torch.tensor(edge_vec_atoms, dtype=self.dtype),
             nbr_shift=torch.tensor(nbr_shift, dtype=self.dtype),
-            operator=torch.tensor(operator, dtype=self.dtype),
-            operator_mask=torch.LongTensor(operator_mask).bool().flatten(),
+            operator_onsite=torch.tensor(operator_onsite, dtype=self.dtype),
+            operator_onsite_mask=torch.LongTensor(operator_onsite_mask)
+            .bool()
+            .flatten(),
+            operator_offsite=torch.tensor(operator_offsite, dtype=self.dtype),
+            operator_offsite_mask=torch.LongTensor(operator_offsite_mask)
+            .bool()
+            .flatten(),
             edge_index_operator=torch.LongTensor(edge_index_operator.T),
             edge_vec_operator=torch.tensor(edge_vec_operator, dtype=self.dtype),
             name=name,
