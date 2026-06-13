@@ -142,10 +142,6 @@ class IO_Abacus_Operator:
         j = edge_index[:, 1]
         edge_vec = pos[j] - pos[i] + cell_shift @ cell
 
-        # concatenate operator
-        operator = np.concatenate([operator_onsite, operator_offsite])
-        operator_mask = np.concatenate([operator_onsite_mask, operator_offsite_mask])
-
         return (
             name,
             cell,
@@ -153,8 +149,10 @@ class IO_Abacus_Operator:
             pos,
             edge_index,
             edge_vec,
-            operator,
-            operator_mask,
+            operator_onsite,
+            operator_onsite_mask,
+            operator_offsite,
+            operator_offsite_mask,
         )
 
     def write_data(self):

@@ -318,6 +318,7 @@ class OperatorOffsiteLayer(torch.nn.Module):
         self,
         irreps_node_features,
         cutoff,
+        symmetrize,
         basis_cfg,
         n_radial_basis,
         num_radial_filter_layers,
@@ -326,6 +327,7 @@ class OperatorOffsiteLayer(torch.nn.Module):
         super().__init__()
 
         self.basis_cfg = basis_cfg
+        self.symmetrize = symmetrize
         irreps_out = e3nn.o3.Irreps(self.basis_cfg.irreps_offsite)
 
         # offsite operator transpose index and coefficient.
@@ -429,7 +431,6 @@ class OperatorOffsiteLayer(torch.nn.Module):
         operator_edge_embedding = self.radial_basis(operator_edge_length)
 
         Y_lm = self.spharm_edges(operator_edge)
-        _Y_lm = Y_lm * self.edge_sh_parity
         iedge = data["edge_index_operator"][0, :]
         jedge = data["edge_index_operator"][1, :]
 
@@ -440,13 +441,17 @@ class OperatorOffsiteLayer(torch.nn.Module):
         edge_tensors = self.tp(edge_features, Y_lm, weight)
         edge_tensors = self.linear_2(edge_tensors)
 
-        _edge_tensors = self.tp(edge_features, _Y_lm, weight)
-        _edge_tensors = self.linear_2(_edge_tensors)
+        if self.symmetrize:
+            _Y_lm = Y_lm * self.edge_sh_parity
+            _edge_tensors = self.tp(edge_features, _Y_lm, weight)
+            _edge_tensors = self.linear_2(_edge_tensors)
 
-        data["node_operator_offsite"] = 0.5 * (
-            edge_tensors
-            + (_edge_tensors[..., self.transpose_index]) * self.transpose_coeff
-        )
+            data["node_operator_offsite"] = 0.5 * (
+                edge_tensors
+                + (_edge_tensors[..., self.transpose_index]) * self.transpose_coeff
+            )
+        else:
+            data["node_operator_offsite"] = edge_tensors
 
 
 class Encoder(torch.nn.Module):
@@ -613,6 +618,17 @@ class HermitianOperator(torch.nn.Module):
     def __init__(self, basis_cfg, config):
         super().__init__()
         self.basis_cfg = basis_cfg
+        self.task = config.operator.task
+
+        # determine execution modes and intervals during initialization
+        if self.task == 0:
+            self.modes = ["onsite"]
+        elif self.task == 1:
+            self.modes = ["offsite"]
+        elif self.task == 2:
+            self.modes = ["onsite", "offsite"]
+
+        self.intervals = {"onsite": 2, "offsite": 1}
 
         self.cg_cal = ClebschGordan()
         self.representation = Encoder(
@@ -632,87 +648,86 @@ class HermitianOperator(torch.nn.Module):
         self.offsite = OperatorOffsiteLayer(
             irreps_node_features=config.atom.conv.irreps_node_features,
             cutoff=config.operator.offsite.cutoff,
+            symmetrize=config.operator.offsite.symmetrize,
             basis_cfg=basis_cfg,
             n_radial_basis=config.operator.offsite.n_radial_basis,
             num_radial_filter_layers=config.operator.offsite.num_radial_filter_layers,
             num_radial_filter_neurons=config.operator.offsite.num_radial_filter_neurons,
         )
 
-    def sum2product(self, l1, l2, opeartor_irreps, operator_block, mode="onsite"):
+    def sum2product(self, l1, l2, operator_irreps, operator_block, interval):
         l_min = abs(l2 - l1)
         l_max = l1 + l2
-
         idx_element = 0
-        if mode == "onsite":
-            interval = 2
-        elif mode == "offsite":
-            interval = 1
+
         for lmain in range(l_min, l_max + 1, interval):
             # this 2L+1 coefficient is due to e3nn's convention
             cg = self.cg_cal(l1, l2, lmain) * (2 * lmain + 1)
             operator_block += torch.einsum(
                 "ijk, mk->mij",
                 cg,
-                opeartor_irreps[:, idx_element : idx_element + 2 * lmain + 1],
+                operator_irreps[:, idx_element : idx_element + 2 * lmain + 1],
             )
             idx_element += 2 * lmain + 1
 
-        return
-
     def forward(self, data, batch=None):
         self.representation(data)
-        self.onsite(data)
-        self.offsite(data)
+
+        if "onsite" in self.modes:
+            self.onsite(data)
+        if "offsite" in self.modes:
+            self.offsite(data)
 
         device = data["pos"].device
         dtype = data["pos"].dtype
-        #
-        # transform irreps to operator
-        #
-        n_atom = len(data["z"])
-        n_edge = len(data["edge_vec_operator"])
-        operator_onsite = torch.zeros(
-            (n_atom, self.basis_cfg.size, self.basis_cfg.size),
-            device=device,
-            dtype=dtype,
-        )
-        operator_offsite = torch.zeros(
-            (n_edge, self.basis_cfg.size, self.basis_cfg.size),
-            device=device,
-            dtype=dtype,
-        )
+
+        operators = {}
+        configs = {}
+
+        # setup configurations based on pre-determined modes
+        if "onsite" in self.modes:
+            n_atom = len(data["z"])
+            operators["onsite"] = torch.zeros(
+                (n_atom, self.basis_cfg.size, self.basis_cfg.size),
+                device=device,
+                dtype=dtype,
+            )
+            configs["onsite"] = (
+                data["node_operator_onsite"],
+                self.basis_cfg.i1i2_start_onsite,
+                self.intervals["onsite"],
+            )
+
+        if "offsite" in self.modes:
+            n_edge = len(data["edge_vec_operator"])
+            operators["offsite"] = torch.zeros(
+                (n_edge, self.basis_cfg.size, self.basis_cfg.size),
+                device=device,
+                dtype=dtype,
+            )
+            configs["offsite"] = (
+                data["node_operator_offsite"],
+                self.basis_cfg.i1i2_start_offsite,
+                self.intervals["offsite"],
+            )
+
+        # single double-loop to build operators
         for i, l_i in enumerate(self.basis_cfg.basis):
             for j, l_j in enumerate(self.basis_cfg.basis):
                 istart_i = self.basis_cfg.basis_start[i]
                 istart_j = self.basis_cfg.basis_start[j]
 
-                self.sum2product(
-                    l_i,
-                    l_j,
-                    data["node_operator_onsite"][
-                        :, self.basis_cfg.i1i2_start_onsite[i][j] :
-                    ],
-                    operator_onsite[
-                        :,
-                        istart_i : istart_i + 2 * l_i + 1,
-                        istart_j : istart_j + 2 * l_j + 1,
-                    ],
-                    mode="onsite",
-                )
-                self.sum2product(
-                    l_i,
-                    l_j,
-                    data["node_operator_offsite"][
-                        :, self.basis_cfg.i1i2_start_offsite[i][j] :
-                    ],
-                    operator_offsite[
-                        :,
-                        istart_i : istart_i + 2 * l_i + 1,
-                        istart_j : istart_j + 2 * l_j + 1,
-                    ],
-                    mode="offsite",
-                )
-
-        return {
-            "operator": torch.concatenate([operator_onsite, operator_offsite]),
-        }
+                for mode in self.modes:
+                    op_data, start_cfg, interval = configs[mode]
+                    self.sum2product(
+                        l_i,
+                        l_j,
+                        op_data[:, start_cfg[i][j] :],
+                        operators[mode][
+                            :,
+                            istart_i : istart_i + 2 * l_i + 1,
+                            istart_j : istart_j + 2 * l_j + 1,
+                        ],
+                        interval=interval,
+                    )
+        return {f"operator_{mode}": operators[mode] for mode in self.modes}
