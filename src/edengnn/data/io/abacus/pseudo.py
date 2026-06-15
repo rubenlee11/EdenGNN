@@ -181,6 +181,7 @@ def build_basis(basis):
     if basis != sorted(basis):
         sys.exit("Error: BASIS is not sorted in ascending order. Exiting program.")
 
+    l_max = max(basis)
     count = 0
     basis_start = []
     for l in basis:
@@ -232,19 +233,23 @@ def build_basis(basis):
         atom_idx_list = []
         l_counts = {}
 
-        for l in irreps:
-            count_l = l_counts.get(l, 0)
-            # Fetch the start position based on the occurrence count
-            atom_idx_list.append(l_to_starts[l][count_l])
-            l_counts[l] = count_l + 1
+        _l_max = max(irreps)
+        if _l_max > l_max:
+            continue
+        else:
+            for l in irreps:
+                count_l = l_counts.get(l, 0)
+                # Fetch the start position based on the occurrence count
+                atom_idx_list.append(l_to_starts[l][count_l])
+                l_counts[l] = count_l + 1
 
-        atom_irreps_idx[atom] = atom_idx_list
+            atom_irreps_idx[atom] = atom_idx_list
 
     return BasisConfig(
         basis=basis,
         size=basis_size,
         basis_start=basis_start,
-        l_max=max(basis),
+        l_max=l_max,
         irreps_onsite=irreps_onsite,
         i1i2_start_onsite=i1i2_start_onsite,
         size_onsite=size_onsite,
