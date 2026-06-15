@@ -109,9 +109,7 @@ class IO_Abacus_Operator:
             :, :, self.basis_cfg.index_dft2e3nn
         ]
         phase = np.asarray(self.basis_cfg.phase_dft2e3nn)
-        operator_onsite = (
-            operator_onsite * phase[None, :, None] * phase[None, None, :]
-        )
+        operator_onsite = operator_onsite * phase[None, :, None] * phase[None, None, :]
         operator_onsite_mask = operator_onsite_mask[
             :, self.basis_cfg.index_dft2e3nn, :
         ][:, :, self.basis_cfg.index_dft2e3nn]
@@ -139,16 +137,10 @@ class IO_Abacus_Operator:
             :, self.basis_cfg.index_dft2e3nn, :
         ][:, :, self.basis_cfg.index_dft2e3nn]
 
-        # calculate cell shift vectors
-        nbr_shift = cell_shift @ cell
         # calculate edge vectors
         i = edge_index[:, 0]
         j = edge_index[:, 1]
-        edge_vec = pos[j] - pos[i] + nbr_shift
-
-        # concatenate operator
-        operator = np.concatenate([operator_onsite, operator_offsite])
-        operator_mask = np.concatenate([operator_onsite_mask, operator_offsite_mask])
+        edge_vec = pos[j] - pos[i] + cell_shift @ cell
 
         return (
             name,
@@ -157,9 +149,10 @@ class IO_Abacus_Operator:
             pos,
             edge_index,
             edge_vec,
-            nbr_shift,
-            operator,
-            operator_mask,
+            operator_onsite,
+            operator_onsite_mask,
+            operator_offsite,
+            operator_offsite_mask,
         )
 
     def write_data(self):

@@ -57,11 +57,16 @@ class Model(L.LightningModule):
         self.task = kwargs.get("task", 2)
 
         self.best_val = torch.tensor(float("inf"))
-        # for parity plots
-        self.preds_aug = []
-        self.targets_aug = []
-        self.preds_operator = []
-        self.targets_operator = []
+
+        # for learning operators, we only compute loss on non-zero blocks.
+        self.mask_map = {
+            "aug_tensor": "aug_mask",
+            "operator_onsite": "operator_onsite_mask",
+            "operator_offsite": "operator_offsite_mask",
+        }
+        # for parity plot data
+        plot_keys = list(self.mask_map.keys())
+        self.parity_data = {key: {"preds": [], "targets": []} for key in plot_keys}
 
     def forward(self, batch):
         return self.model(batch)
@@ -72,33 +77,21 @@ class Model(L.LightningModule):
         convenient to recover chgcar format with irreps form than with compact form.
         """
         output = self(batch)
-
         loss = 0
+
         for key, value in output.items():
-            if key == "aug_tensor" or key == "operator":
-                if key == "aug_tensor":
-                    key_mask = "aug_mask"
-                elif key == "operator":
-                    key_mask = "operator_mask"
-                loss += (
-                    self.loss_fn[self.loss_dict[key]["loss"]](
-                        batch[key].flatten()[batch[key_mask]],
-                        value.flatten()[batch[key_mask]],
-                    )
-                    * self.loss_dict[key]["weight_train"]
-                )
+            loss_fn = self.loss_fn[self.loss_dict[key]["loss"]]
+            weight = self.loss_dict[key]["weight_train"]
+
+            if key in self.mask_map:
+                mask = batch[self.mask_map[key]]
+                target = batch[key].flatten()[mask]
+                pred = value.flatten()[mask]
+                loss += loss_fn(target, pred) * weight
             elif key == "total_charge":
-                loss += (
-                    self.loss_fn[self.loss_dict[key]["loss"]](
-                        batch["grid_func_out"].mean(), value
-                    )
-                    * self.loss_dict[key]["weight_train"]
-                )
+                loss += loss_fn(batch["grid_func_out"].mean(), value) * weight
             else:
-                loss += (
-                    self.loss_fn[self.loss_dict[key]["loss"]](batch[key], value)
-                    * self.loss_dict[key]["weight_train"]
-                )
+                loss += loss_fn(batch[key], value) * weight
 
         if self.global_step % self.log_every_n_steps == 0:
             self.wandb_run.log(
@@ -126,23 +119,21 @@ class Model(L.LightningModule):
                     / batch["nelec"][0]
                     * batch["dvolume"][0]
                 )
-            elif key == "aug_tensor":
-                aug_tar = batch[key].flatten()[batch["aug_mask"]]
-                aug_pre = value.flatten()[batch["aug_mask"]]
-                losses[key] = self.loss_fn["L1"](aug_tar, aug_pre)
-                self.targets_aug.append(aug_tar.detach().cpu())
-                self.preds_aug.append(aug_pre.detach().cpu())
-            elif key == "operator":
-                tar = batch[key].flatten()[batch["operator_mask"]]
-                pre = value.flatten()[batch["operator_mask"]]
-                losses[key] = self.loss_fn["L1"](tar, pre)
-                self.targets_operator.append(tar.detach().cpu())
-                self.preds_operator.append(pre.detach().cpu())
             elif key == "total_charge":
                 losses[key] = (
                     self.loss_fn["L1"](value, batch["grid_func_out"].mean())
                     * batch["volume"][0]
                 )
+            elif key in self.mask_map:
+                mask = batch[self.mask_map[key]]
+                tar = batch[key].flatten()[mask]
+                pre = value.flatten()[mask]
+                losses[key] = self.loss_fn["L1"](tar, pre)
+
+                n_plot = min(20 * len(mask), tar.numel())
+                plot_idx = torch.randperm(tar.numel(), device=tar.device)[:n_plot]
+                self.parity_data[key]["targets"].append(tar[plot_idx].detach().cpu())
+                self.parity_data[key]["preds"].append(pre[plot_idx].detach().cpu())
 
         info_log = f"[Validation] Epoch {self.current_epoch + 1}, "
         loss = 0
@@ -286,34 +277,33 @@ class Model(L.LightningModule):
         return [optimizer], [scheduler]
 
     def _plot_parity(self):
-        if len(self.targets_aug) > 0 or len(self.targets_operator) > 0:
-            plot = True
-        else:
-            plot = False
+        for key, data in self.parity_data.items():
+            if not data["targets"]:
+                continue
 
-        if len(self.targets_aug) > 0:
-            preds = torch.cat(self.preds_aug)
-            targets = torch.cat(self.targets_aug)
-            self.targets_aug = []
-            self.preds_aug = []
-        elif len(self.targets_operator) > 0:
-            preds = torch.cat(self.preds_operator)
-            targets = torch.cat(self.targets_operator)
-            self.targets_operator = []
-            self.preds_operator = []
+            targets = torch.cat(data["targets"])
+            preds = torch.cat(data["preds"])
 
-        if plot:
+            data["targets"].clear()
+            data["preds"].clear()
+
             plt.figure()
             plt.plot(
                 [targets.min(), targets.max()],
                 [targets.min(), targets.max()],
-                color=colors[1],
+                color="C1",
             )
-            plt.scatter(targets, preds, s=2, color=colors[0], zorder=10)
+            max_points = 50000
+            if targets.numel() > max_points:
+                idx = torch.randperm(targets.numel())[:max_points]
+                targets = targets[idx]
+                preds = preds[idx]
+            plt.scatter(targets, preds, s=2, color="C0", zorder=10)
             plt.xlabel("True")
             plt.ylabel("Pred")
-            plt.title("Parity Plot")
-            img_path = os.path.join(self.save_dir, "parity_plot.png")
+            plt.title(f"Parity Plot: {key}")
+
+            img_path = os.path.join(self.save_dir, f"parity_plot_{key}.png")
             plt.savefig(img_path, dpi=300, bbox_inches="tight")
             plt.close()
 
