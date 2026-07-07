@@ -156,9 +156,29 @@ edengnn-predict --config path/to/config.yaml
 
 ## Pre-trained Models
 
+### Universal Charge Density for VASP
+
 **EdenGNN-Uni** is a pre-trained universal charge density model trained on non-magnetic materials from the Materials Project database. 
 
 To use EdenGNN-Uni for predicting electronic structures, please ensure that your input structures use the **exact same PAW pseudopotential versions** as those used as the training set.
+
+### Universal Charge Density for ABACUS
+
+This pre-trained models can be downloaded from the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN). The training datasets consists of 50,000 non-magnetic structures fetched from the original Materials Project database. 
+
+To use this pre-trained model for band structure predictions, firstly we need to compile the modified ABACUS code, install the corresponding pseudopotential and basis sets used in the training datasets.
+
+* Apply the patch by copying the contents of `scripts/abacus/patch_deltarho` to the source code directory of **ABACUS** v3.10.0, overwriting the existing files, and then compile it.
+
+* Download the SG15 pseudopotentials and the standard atomic orbitals from [here](https://abacus.ustc.edu.cn/pseudo/list.htm), and install them following the instructions in the ASE ABACUS [interface](https://gitlab.com/1041176461/ase-abacus). Ensure that ASE can access the pseudopotentials and basis sets through the environment variables `ABACUS_PP_PATH` and `ABACUS_ORBITAL_PATH`.
+
+During the predicting stage, first configure the parameters for model prediction, and then execute band diagonalization using the modified **ABACUS** executable.
+
+* Set the `save_dir`, `checkpoint`, `path_predict` and optionally `chunk_size_predict` to optimize performance. The detailed definitions of these tags can be found in the example `config.yaml` file. Specifically, `path_predict` should point to a `filelist.txt` containing the paths of the structure files (e.g., `.cif` or `POSCAR`).
+
+* Run with `edengnn-predict --config /path/to/config.yaml`.
+
+* Run **ABACUS** in the resulting directories which contains the input parameters and the predicted difference charge density files. 
 
 ## Troubleshooting
 
