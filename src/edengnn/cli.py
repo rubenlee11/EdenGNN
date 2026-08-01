@@ -371,7 +371,12 @@ def main(mode=None):
         accelerator="gpu" if "cuda" in device else "cpu",
         devices=num_gpus,
         strategy=(
-            DDPStrategy(gradient_as_bucket_view=True) if num_gpus > 1 else "auto"
+            DDPStrategy(
+                gradient_as_bucket_view=True,
+                find_unused_parameters=find_unused_parameters,
+            )
+            if num_gpus > 1
+            else "auto"
         ),
         logger=False,
         default_root_dir=save_dir,

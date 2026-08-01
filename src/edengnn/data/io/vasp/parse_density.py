@@ -53,11 +53,11 @@ class IO_VASP:
         self.dir = dir
         self.use_bin = use_bin
 
-        if self.path_template is not None:
-            with open(self.path_template, "r") as f:
-                self.incar_head = f.read()
-        else:
-            self.incar_head = ""
+        # if self.path_template is not None:
+        #    with open(self.path_template, "r") as f:
+        #        self.incar_head = f.read()
+        # else:
+        #    self.incar_head = ""
         return
 
     def read_data(self, path):
@@ -108,7 +108,7 @@ class IO_VASP:
                 os.path.join(path, "CHGCAR")
             )
 
-            density = density_td - density_sad
+            density = density_td
             n1, n2, n3 = density.shape
             nelec = np.sum(density_sad) * volume / (n1 * n2 * n3)
 
@@ -361,7 +361,3 @@ def _read_chgcar(filename):
 
     aug_str = [line.decode("utf-8").rstrip() + "\n" for line in aug_str]
     return z, cell, pos @ cell, volume, density, aug_str
-
-
-def cal_sacd():
-    return None

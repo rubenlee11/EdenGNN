@@ -123,7 +123,7 @@ class IO_Abacus:
                 out_chg=-1,
                 init_chg="drho",
                 scf_thr=1e-6,
-                smearing_method="gaussian",
+                smearing_method="mv",
                 smearing_sigma=0.015,
                 ecutwfc=self.ecutwfc,
                 suffix=self.prefix,
