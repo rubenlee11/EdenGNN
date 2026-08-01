@@ -41,6 +41,8 @@ For offline installation, use:
 pip install . --no-index --no-build-isolation
 ```
 
+Note that a fortran compiler (such as gfortran) is needed.
+
 2. Prepare your DFT softwares.
 
 - For performing non-self-consistent calculations in **OpenMX** 3.9 with predicted charge density, you need to recompile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
@@ -51,7 +53,7 @@ pip install . --no-index --no-build-isolation
 
 ## Usage
 
-The best way to learn how to use **EdenGNN** is to run the examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing). Some trained model weights are stored at the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN), and example density files can be downloaded via this [link](https://huggingface.co/datasets/TrueSavage/EdenGNN-Data). Detailed parameter descriptions can be found in `config.yaml`.
+You can run **EdenGNN** examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing). Some trained model weights are stored at the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN), and example density files can be downloaded via this [link](https://huggingface.co/datasets/TrueSavage/EdenGNN-Data). Detailed parameter descriptions can be found in `config.yaml`.
 
 
 * **Important Note:** The following instructions are tailored for the VASP software using PAW pseudopotentials.

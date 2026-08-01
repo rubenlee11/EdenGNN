@@ -118,7 +118,7 @@ data:
   use_bin: False 
 
   # [default] Currently EdenGNN only supports batch size = 1. batch > 1 will 
-  # raise errors.
+  # raise errors. You can use muiltiple GPUs (DDP mode) to effectively increase the batch size.
   batch_size: 1
 
 optimize:
