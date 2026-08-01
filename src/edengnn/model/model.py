@@ -589,7 +589,7 @@ class EfficientDensity(torch.nn.Module):
     def _cal_density(self, data, output):
         self.probe(data)
         if self.use_sad:
-            grid_func_out = data["charge"] + data["grid_func_in"][0]
+            grid_func_out = data["charge"] + data["grid_func_in"]
         else:
             grid_func_out = data["charge"]
         output["grid_func_out"] = grid_func_out

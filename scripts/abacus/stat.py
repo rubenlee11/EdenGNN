@@ -144,10 +144,8 @@ def parse_band(dir, prefix, ax, color="b"):
     return bands, ef
 
 
-path_dir = "/public/home/lixiwen/dataset/universal_abacus/mc3d/dataset_test_gnome.txt"
-dir_tar = (
-    "/public/home/lixiwen/dataset/universal_abacus/edengnn/2026-05-23-19-02-35/target"
-)
+path_dir = "/root/dataset/universal_abacus/test_chuangzhi/mp-1204356/data.txt"
+dir_tar = "/root/dataset/universal_abacus/test_chuangzhi/mp-1204356/target"
 with open(path_dir, "r") as f:
     paths = [line.strip() for line in f]
 

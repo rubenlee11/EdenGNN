@@ -4,7 +4,7 @@ from vesin import NeighborList
 from pymatgen.core import Structure
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data
-
+from pymatgen.io.vasp import Chgcar
 from edengnn.data.io.vasp.parse_density import parse_aug
 from edengnn.data.io.utils import get_mask_r, pos2n
 
@@ -94,6 +94,13 @@ class AugDataset(torch.utils.data.Dataset):
                 aug_lines = np.load(
                     os.path.join(path_scf, "aug.npz"), allow_pickle=True
                 )["data_aug"].item()["total"]
+        else:
+            chgcar_sad = Chgcar.from_file(os.path.join(path, "CHGCAR"))
+            structure = chgcar_sad.structure
+            aug_lines_in = chgcar_sad.data_aug["total"]
+            if not self.stage_predict:
+                chgcar = Chgcar.from_file(os.path.join(self.dir, f"{name}", "CHGCAR"))
+                aug_lines = chgcar.data_aug["total"]
 
         z = structure.atomic_numbers
         pos = structure.cart_coords
@@ -227,13 +234,7 @@ class DensityDataset(torch.utils.data.Dataset):
                 if (self.stage == "train" or self.stage == "val")
                 else None
             )
-            data["grid_func_in"] = (
-                (
-                    torch.tensor(density_sad, dtype=self.dtype)
-                    if (self.stage == "predict")
-                    else None
-                ),
-            )
+            data["grid_func_in"] = torch.tensor(density_sad, dtype=self.dtype)
             data["lmix_max"] = self.io_dft.lmix_max
 
         return data
