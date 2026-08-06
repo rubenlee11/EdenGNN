@@ -412,7 +412,6 @@ def main(mode=None):
             save_dir=save_dir,
             dir=cfg.data.vasp.dir,
             use_bin=cfg.data.use_bin,
-            path_template=cfg.data.vasp.path_template,
             encut=cfg.data.vasp.encut,
             lmix_max=cfg.data.vasp.lmix_max,
             dk_bz=cfg.data.dk_bz,

@@ -135,7 +135,7 @@ optimize:
       loss: "L1"
     # this is deprecated. total charge errors are logged during training
     total_charge:
-      #weight_train: 0.0 # deprecated
+      weight_train: 0.0 # deprecated
       weight_val: 0.0
       loss: "L2"
     operator:
