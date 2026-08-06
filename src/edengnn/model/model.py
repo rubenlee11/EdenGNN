@@ -593,7 +593,7 @@ class EfficientDensity(torch.nn.Module):
         else:
             grid_func_out = data["charge"]
         output["grid_func_out"] = grid_func_out
-        output["total_charge"] = grid_func_out.mean()
+        output["total_charge"] = grid_func_out.mean() * data["volume"]
 
     def _cal_aug(self, data, output):
         self.aug(data)
