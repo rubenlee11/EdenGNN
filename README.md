@@ -1,4 +1,5 @@
 # EdenGNN
+[![DOI](https://zenodo.org/badge/1150381560.svg)](https://doi.org/10.5281/zenodo.22690478)
 
 **EdenGNN** (Equivariant Density Graph Neural Network) is an open framework for accurate and efficient charge density prediction. Integrated with DFT softwares, it can predict electronic structures directly from atomic configurations.
 
