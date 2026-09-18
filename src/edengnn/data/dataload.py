@@ -223,7 +223,7 @@ class DensityDataset(torch.utils.data.Dataset):
             npb_total=len(z) * npb,
             npb=npb,
             nelec=torch.tensor(nelec, dtype=self.dtype),
-            volume=volume,
+            volume=torch.tensor(volume, dtype=self.dtype),
             dvolume=torch.tensor(dvolume, dtype=self.dtype),
         )
 

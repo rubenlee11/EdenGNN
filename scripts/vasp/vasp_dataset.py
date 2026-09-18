@@ -52,6 +52,7 @@ def _vasp_scf(structure, dir_work, cfg):
         "ADDGRID": True,
         "SYMPREC": 1e-8,
         "ISYM": -1,
+        "EDIFF": 1e-6,
     }
 
     if cfg.incar.get("encut"):

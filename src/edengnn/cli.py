@@ -89,7 +89,7 @@ class Model(L.LightningModule):
                 pred = value.flatten()[mask]
                 loss += loss_fn(target, pred) * weight
             elif key == "total_charge":
-                loss += loss_fn(batch["grid_func_out"].mean(), value) * weight
+                loss += loss_fn(batch["grid_func_out"].mean()* batch["volume"][0], value) * weight
             else:
                 loss += loss_fn(batch[key], value) * weight
 
