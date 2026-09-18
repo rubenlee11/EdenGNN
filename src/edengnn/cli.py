@@ -120,10 +120,7 @@ class Model(L.LightningModule):
                     * batch["dvolume"][0]
                 )
             elif key == "total_charge":
-                losses[key] = (
-                    self.loss_fn["L1"](value, batch["grid_func_out"].mean())
-                    * batch["volume"][0]
-                )
+                losses[key] = self.loss_fn["L1"](value, batch["grid_func_out"].mean() * batch["volume"][0])
             elif key in self.mask_map:
                 mask = batch[self.mask_map[key]]
                 tar = batch[key].flatten()[mask]
