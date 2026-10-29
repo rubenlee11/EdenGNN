@@ -270,6 +270,16 @@ class Model(L.LightningModule):
                     "frequency": self.check_val_every_n_epoch,
                     "strict": False,
                 }
+        elif self.scheduler.type == "CosineAnnealingLR":
+            scheduler = {
+                "scheduler": torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    T_max=self.scheduler.CosineAnnealingLR.T_max,
+                    eta_min=self.scheduler.CosineAnnealingLR.eta_min,
+                ),
+                "interval": "step",
+                "frequency": 1,
+            }                
 
         return [optimizer], [scheduler]
 
