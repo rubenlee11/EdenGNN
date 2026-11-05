@@ -380,7 +380,6 @@ def main(mode=None):
         strategy=(
             DDPStrategy(
                 gradient_as_bucket_view=True,
-                find_unused_parameters=find_unused_parameters,
             )
             if num_gpus > 1
             else "auto"
