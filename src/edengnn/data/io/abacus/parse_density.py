@@ -76,7 +76,7 @@ class IO_Abacus:
             # write kpt
             r_cell = structure.lattice.reciprocal_lattice.matrix
             k_grid = np.maximum(
-                np.round(np.linalg.norm(r_cell, axis=1) / self.dk_bz), 1
+                np.ceil(np.round(np.linalg.norm(r_cell, axis=1) / self.dk_bz, 5)), 1
             ).astype(int)
             self.write_input(name, structure, k_grid)
 
