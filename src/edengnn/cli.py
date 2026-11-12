@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from edengnn.data.dataload import get_loader
-from edengnn.model.model import EfficientDensity, HermitianOperator
+from edengnn.model.model import EfficientDensity
 from edengnn.data.io.utils import RYDBERG
 
 colors = plt.cm.tab10.colors
@@ -176,9 +176,6 @@ class Model(L.LightningModule):
         self.logger_.info(info_log)
 
         self._plot_parity()
-        #
-        # self.lr_schedulers().step(val_metrics["val/loss"])
-
         current_val = float(val_metrics["val/loss"])
         if self.current_epoch > 0:
             if current_val < self.best_val:
@@ -351,13 +348,7 @@ def main(mode=None):
     )
 
     logger.info("[Init] Building model...")
-    if cfg.run.task == 3:
-        from edengnn.data.io.abacus.pseudo import build_basis
-
-        basis_cfg = build_basis(cfg.model.operator.basis)
-        model = HermitianOperator(basis_cfg, cfg.model).to(DTYPE)
-    else:
-        model = EfficientDensity(cfg.model).to(DTYPE)
+    model = EfficientDensity(cfg.model).to(DTYPE)
     logger.info("%s", OmegaConf.to_yaml(cfg.model))
 
     wandb_run = wandb.init(
@@ -418,31 +409,22 @@ def main(mode=None):
             save_dir=save_dir,
             dir=cfg.data.vasp.dir,
             use_bin=cfg.data.use_bin,
-            encut=cfg.data.vasp.encut,
             lmix_max=cfg.data.vasp.lmix_max,
+            path_pp=cfg.data.vasp.path_pp,
+        )
+    elif cfg.data.dft_software == "abacus":
+        from edengnn.data.io.abacus.parse_density import IO_Abacus
+
+        io_dft = IO_Abacus(
+            stage=cfg.run.mode,
+            save_dir=save_dir,
+            prefix=cfg.data.abacus.prefix,
+            path_pp=cfg.data.abacus.get("path_pp"),
+            path_input=cfg.data.abacus.get("path_input"),
             dk_bz=cfg.data.dk_bz,
             dk_band=cfg.data.dk_band,
             plot_band=cfg.data.plot_band,
         )
-    elif cfg.data.dft_software == "abacus":
-        if cfg.run.task == 3:
-            from edengnn.data.io.abacus.parse_operator import IO_Abacus_Operator
-
-            io_dft = IO_Abacus_Operator(
-                basis_cfg, threshold=1e-5 / RYDBERG, unit=RYDBERG
-            )
-        else:
-            from edengnn.data.io.abacus.parse_density import IO_Abacus
-
-            io_dft = IO_Abacus(
-                stage=cfg.run.mode,
-                save_dir=save_dir,
-                prefix=cfg.data.abacus.prefix,
-                ecutwfc=cfg.data.abacus.ecutwfc,
-                dk_bz=cfg.data.dk_bz,
-                dk_band=cfg.data.dk_band,
-                plot_band=cfg.data.plot_band,
-            )
     elif cfg.data.dft_software == "siesta":
         from edengnn.data.io.siesta.parse_density import IO_Siesta
 

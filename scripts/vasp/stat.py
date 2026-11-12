@@ -1,17 +1,32 @@
-"""-----------------------------------------------------------------------------
+r"""Compare VASP NSCF/SCF results and save statistics and parity plots.
 
-Analysis VASP calculations
+Usage (activate the eqgnn environment first):
+    python scripts/vasp/stat.py \
+        --filelist /path/to/calculation_dirs.txt \
+        --save-dir /path/to/statistics --nproc 4
+    # Optional separate reference root:
+    python scripts/vasp/stat.py \
+        --filelist /path/to/calculation_dirs.txt \
+        --dir-tar /path/to/reference --save-dir /path/to/statistics
 
-Usage: python vasp_stat.py --config config_vasp.yaml
+Inputs:
+    --filelist Required list of structure calculation directories, one per line.
+               Each contains nscf/ and, by default, scf/.
+    --save-dir Required directory for stat_mae.json and aggregate parity PDFs.
+    --dir-tar  Optional reference root; read <root>/<structure name>/scf/.
+               Without this option, read scf/ alongside each nscf/ directory.
+    --nproc    Parallel analysis processes (default: 1).
 
------------------------------------------------------------------------------"""
+SCF and NSCF directories need vasprun.xml, KPOINTS and CHGCAR.
+Retains band-energy, density, augmentation, energy-per-atom, band-gap and force
+statistics. Per-structure comparison images are saved in the listed directories.
+"""
 
-import os, glob, pathlib, json, argparse, multiprocessing, re
+import os, pathlib, json, argparse, multiprocessing, re
 import numpy as np
 from pymatgen.io.vasp.outputs import Vasprun
 from pymatgen.io.vasp import Chgcar
 from pymatgen.electronic_structure.core import Spin
-from omegaconf import OmegaConf
 import matplotlib
 from matplotlib.lines import Line2D
 
@@ -325,13 +340,12 @@ def stat_vasprun(work_path, band=False):
         return None
 
 
-def stat_structure(dir_work, cfg):
+def stat_structure(dir_work, args):
     name = pathlib.Path(dir_work).stem
     try:
         path_nscf = os.path.join(dir_work, "nscf")
-        if isinstance(cfg.stat.tar_dir, str) and cfg.stat.tar_dir:
-            name = pathlib.Path(dir_work)
-            path_scf = os.path.join(cfg.stat.tar_dir, name, "scf")
+        if args.dir_tar is not None:
+            path_scf = os.path.join(args.dir_tar, name, "scf")
         else:
             path_scf = os.path.join(dir_work, "scf")
 
@@ -362,10 +376,10 @@ def stat_structure(dir_work, cfg):
 
         # plot density
         chg_nscf, aug_nscf = parse_chgcar(
-            os.path.join(path_nscf, "CHGCAR"), cfg.incar.lmaxmix
+            os.path.join(path_nscf, "CHGCAR")
         )
         chg_scf, aug_scf = parse_chgcar(
-            os.path.join(path_scf, "CHGCAR"), cfg.incar.lmaxmix
+            os.path.join(path_scf, "CHGCAR")
         )
         den_pre = chg_nscf.flatten()
         den_tar = chg_scf.flatten()
@@ -418,14 +432,17 @@ def stat_structure(dir_work, cfg):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", type=str, required=True, help="Path to the config file"
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    parser.add_argument("--filelist", required=True, type=pathlib.Path, help="List of structure calculation directories")
+    parser.add_argument("--save-dir", required=True, type=pathlib.Path, help="Statistics output directory")
+    parser.add_argument("--dir-tar", type=pathlib.Path, help="Optional reference root containing <name>/scf")
+    parser.add_argument("--nproc", type=int, default=1, help="Parallel analysis processes (default: 1)")
     args = parser.parse_args()
-    cfg = OmegaConf.load(args.config)
-    run_save_dir = cfg.band.get("save_dir")
-    dirs_work = glob.glob(os.path.join(run_save_dir, "*"))
+    args.save_dir.mkdir(parents=True, exist_ok=True)
+    with args.filelist.open() as f:
+        dirs_work = [line.strip() for line in f if line.strip()]
 
     pre_dict = {
         "band_energy": [],
@@ -444,9 +461,12 @@ def main():
         "forces": [],
     }
 
-    nproc = min(multiprocessing.cpu_count(), cfg.run.nproc)
-    with multiprocessing.Pool(processes=nproc) as pool:
-        results = pool.starmap(stat_structure, [(d, cfg) for d in dirs_work])
+    if args.nproc == 1:
+        results = [stat_structure(path, args) for path in dirs_work]
+    else:
+        nproc = min(multiprocessing.cpu_count(), args.nproc)
+        with multiprocessing.Pool(processes=nproc) as pool:
+            results = pool.starmap(stat_structure, [(path, args) for path in dirs_work])
 
     maes = []
     for result in results:
@@ -458,7 +478,10 @@ def main():
             for key, value in result["tar"].items():
                 tar_dict[key].extend(value)
 
-    with open(os.path.join(cfg.stat.save_dir, "stat_mae.json"), "w") as f:
+    if not maes:
+        raise ValueError("No structures were processed; statistics cannot be calculated.")
+
+    with open(os.path.join(args.save_dir, "stat_mae.json"), "w") as f:
         json.dump(maes, f, indent=2)
 
     # calculate mae and plot parity plot
@@ -469,7 +492,7 @@ def main():
         plot_parity(
             np.array(pre_dict[key]),
             np.array(tar_dict[key]),
-            os.path.join(cfg.stat.save_dir, f"parity_{key}.pdf"),
+            os.path.join(args.save_dir, f"parity_{key}.pdf"),
             mae=sum(values) / len(values),
             label=key,
         )

@@ -5,6 +5,7 @@
 System.CurrrentDirectory         ./
 level.of.stdout                   1
 level.of.fileout                  1
+# 
 DATA.PATH          /public/home/lixiwen/software/openmx3.9/DFT_DATA19
 
 scf.XcType                    GGA-PBE
@@ -19,7 +20,7 @@ scf.Max.Mixing.Weight         0.30
 scf.Mixing.History            25
 scf.Mixing.StartPulay         15
 scf.criterion                 1.0e-7
-# the mlcd mode is available after installing the patch_nsc 
+# the mlcd mode is available after installing the patch_nsc on OpenMX 3.9
 scf.restart    mlcd
 
 MD.Type                       nomd

@@ -1,0 +1,274 @@
+{
+  "Ag": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ag.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ag_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Al": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Al.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Al_gga_7au_100Ry_4s4p1d.orb"
+  },
+  "Ar": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ar.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ar_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "As": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/As.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/As_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Au": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Au.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Au_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "B": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/B.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/B_gga_8au_100Ry_2s2p1d.orb"
+  },
+  "Ba": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ba.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ba_gga_10au_100Ry_4s2p2d1f.orb"
+  },
+  "Be": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Be.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Be_gga_7au_100Ry_4s1p.orb"
+  },
+  "Bi": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Bi.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Bi_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Br": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Br.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Br_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "C": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/C.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/C_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Ca": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ca.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ca_gga_9au_100Ry_4s2p1d.orb"
+  },
+  "Cd": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Cd.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Cd_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Cl": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Cl.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Cl_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Co": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Co.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Co_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Cr": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Cr.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Cr_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Cs": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Cs.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Cs_gga_10au_100Ry_4s2p1d.orb"
+  },
+  "Cu": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Cu.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Cu_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "F": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/F.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/F_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Fe": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Fe.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Fe_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Ga": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ga.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ga_gga_8au_100Ry_2s2p2d1f.orb"
+  },
+  "Ge": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ge.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ge_gga_8au_100Ry_2s2p2d1f.orb"
+  },
+  "H": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/H.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/H_gga_6au_100Ry_2s1p.orb"
+  },
+  "He": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/He.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/He_gga_6au_100Ry_2s1p.orb"
+  },
+  "Hf": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Hf.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Hf_gga_7au_100Ry_4s2p2d2f1g.orb"
+  },
+  "Hg": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Hg.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Hg_gga_9au_100Ry_4s2p2d1f.orb"
+  },
+  "I": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/I.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/I_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "In": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/In.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/In_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Ir": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ir.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ir_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "K": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/K.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/K_gga_9au_100Ry_4s2p1d.orb"
+  },
+  "Kr": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Kr.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Kr_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Li": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Li.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Li_gga_7au_100Ry_4s1p.orb"
+  },
+  "Mg": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Mg.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Mg_gga_8au_100Ry_4s2p1d.orb"
+  },
+  "Mn": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Mn.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Mn_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Mo": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Mo.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Mo_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "N": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/N.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/N_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Na": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Na.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Na_gga_8au_100Ry_4s2p1d.orb"
+  },
+  "Nb": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Nb.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Nb_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Ne": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ne.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ne_gga_6au_100Ry_2s2p1d.orb"
+  },
+  "Ni": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ni.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ni_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "O": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/O.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/O_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Os": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Os.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Os_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "P": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/P.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/P_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Pb": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Pb.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Pb_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Pd": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Pd.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Pd_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Pt": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Pt.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Pt_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Rb": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Rb.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Rb_gga_10au_100Ry_4s2p1d.orb"
+  },
+  "Re": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Re.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Re_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Rh": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Rh.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Rh_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Ru": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ru.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ru_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "S": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/S.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/S_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Sb": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Sb.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Sb_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Sc": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Sc.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Sc_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Se": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Se.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Se_gga_8au_100Ry_2s2p1d.orb"
+  },
+  "Si": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Si.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Si_gga_7au_100Ry_2s2p1d.orb"
+  },
+  "Sn": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Sn.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Sn_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Sr": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Sr.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Sr_gga_9au_100Ry_4s2p1d.orb"
+  },
+  "Ta": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ta.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ta_gga_8au_100Ry_4s2p2d2f1g.orb"
+  },
+  "Tc": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Tc.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Tc_gga_7au_100Ry_4s2p2d1f.orb"
+  },
+  "Te": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Te.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Te_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "Ti": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Ti.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Ti_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Tl": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Tl.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Tl_gga_7au_100Ry_2s2p2d1f.orb"
+  },
+  "V": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/V.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/V_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "W": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/W.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/W_gga_8au_100Ry_4s2p2d2f1g.orb"
+  },
+  "Xe": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Xe.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Xe_gga_8au_100Ry_2s2p2d1f.orb"
+  },
+  "Y": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Y.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Y_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Zn": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Zn.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Zn_gga_8au_100Ry_4s2p2d1f.orb"
+  },
+  "Zr": {
+    "path_pp": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Pseudopotential/Zr.upf",
+    "path_basis": "/root/tools/abacus-develop/data/pseudo_aiida_sg15_oncv/Orbitals/Zr_gga_8au_100Ry_4s2p2d1f.orb"
+  }
+}

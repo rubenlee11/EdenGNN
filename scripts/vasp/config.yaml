@@ -1,17 +1,19 @@
 run:
   nproc: 1
 
+path_pp: /root/research/ml_charge_density/EdenGNN-main/scripts/vasp/pp.json
+
 band:
-  # post process of E3SR, for example nscf calculations
-  dir: "/root/research/e3super-resolution/result/e3sr/2025-11-17-19-46-03/predict/*" # stores chgcars
-  save_dir: "/root/dataset/molecular_dynamics/si/vasp_run_predict"
+  # post process of EdenGNN, for example nscf calculations
+  dir: "" # stores chgcars
+  save_dir: ""
   
 dataset:
   filelist: "" # txt files containing poscar paths
   save_dir: ""
 
 get_poscar:
-  api_key: "3GsNP6XysKmESBOMJBN9Bdtnx9sD92RW"
+  api_key: "" # pymatgen api
   save_dir: "/root/dataset/mp_mos2/poscar"
   random_perturb: 0.1
   num_sampling: 10

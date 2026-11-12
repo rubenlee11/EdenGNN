@@ -63,29 +63,32 @@ data:
     encut: 220 
 
     # [check predict]: number of cpus used for restart OpenMX calculations
-    num_proc: 64  
+    num_proc: 4  
               
   vasp:
     # [check] Should be consistent with the LMAXMIX tag of your VASP calculations
     lmix_max: 6 
 
-    # [default] in [eV]. will be used in the future to specify the grid shape
-    encut: 520
+    # [check] Element -> {path_pp: POTCAR path}; also determines the PAW projector basis.
+    path_pp: /root/research/ml_charge_density/EdenGNN-main/scripts/vasp/pp.json
 
     # [check train] Directory of scf calculations which contain sub directories 
     # the name of which are consistent in data.path_train and data.path_val
     dir:
 
   abacus:
-    # [check train] Abacus 'suffix' keywords. used for reading the training directories
-    prefix: aiida
+    # [check train] ABACUS 'suffix' keywords. used for reading the training directories
+    prefix: PBE
 
-    # [default] in [Rydberg]. See Abacus manual. 
-    ecutwfc: 100
+    # [check] Pseudopotential and basis set. Should be consistent in the training and predicting stages.
+    path_pp: /root/research/ml_charge_density/EdenGNN-main/scripts/abacus/pp.json
+
+    # [check predict] Template must specify ecutwfc (Ry) for the prediction grid.
+    path_input: /root/research/ml_charge_density/EdenGNN-main/scripts/abacus/INPUT
   
   siesta:
     # [check train] SIESTA 'SystemLabel' keywords. used for reading the training directories
-    prefix: aiida
+    prefix: PBE
 
     # [check train] filename of the SIESTA output log
     filename_out: siesta_out
@@ -138,10 +141,6 @@ optimize:
       weight_train: 0.0 # deprecated
       weight_val: 0.0
       loss: "L2"
-    operator:
-      weight_train: 1.0
-      weight_val: 1.0
-      loss: "L1"
 
   # [check train]
   lr: 0.005

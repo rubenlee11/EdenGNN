@@ -1,168 +1,169 @@
-"""-----------------------------------------------------------------------------
+r"""Generate VASP SAD inputs from structure files; does not run VASP.
 
-Generate Superposition of atomic charge from atomic structures
+Usage (activate the eqgnn environment first):
+    python vasp_sad.py \
+        --filelist ~/research/ml_charge_density/aips_tutorial/dataset/vasp/dataset.txt \
+        --save-dir ~/research/ml_charge_density/aips_tutorial/dataset/vasp/sacd \
+        --path-pp ~/research/ml_charge_density/EdenGNN-main/scripts/vasp/pp.json \
+        --path-input ~/research/ml_charge_density/EdenGNN-main/scripts/vasp/template.incar \
+        --for-scf --dk-bz 0.15 --for-band --dk-band 0.037
 
-Usage:
+Inputs:
+    --filelist   Required text file, one CIF/POSCAR structure path per line.
+    --save-dir   Required output directory; each structure uses its file stem.
+    --path-pp    Required JSON: element -> {"path_pp": "/path/to/POTCAR"}.
+                 Relative POTCAR paths are relative to the JSON directory.
+    --path-input Required INCAR template; all calculation parameters come from it.
+    --nproc      Number of parallel input-generation processes (default: 64).
+    --for-scf    Also write a Gamma-centered mesh to KPOINTS_SCF.
+    --dk-bz      Mesh spacing in inverse angstrom (default: 0.15).
+                 N_i = max(1, ceil(|b_i| / dk_bz)), with |b_i| including 2*pi.
+    --for-band   Standardize to the primitive cell and write KPOINTS_BAND.
+                 Without this flag, keep the input cell.
+    --dk-band    Band k-point spacing in inverse angstrom (default: 0.037).
 
-    make sure you have set "PMG_VASP_PSP_DIR"
+Outputs: POSCAR, INCAR, POTCAR, Gamma-only KPOINTS, and optionally KPOINTS_SCF
+and KPOINTS_BAND. All k-points use the cell written to POSCAR.
+ICHARG=12 and NELM=0 override the template. Set other SAD parameters, such as
+ISPIN=1 and LCHARG=.TRUE., in the template.
 
-    python vasp_sad.py --config config.yaml
+For subsequent SCF/NSCF calculations, copy the SAD directory, copy KPOINTS_SCF
+to KPOINTS, and set NELM to the desired iteration limit in INCAR. Use ICHARG=1
+to start SCF from CHGCAR or ICHARG=11 to keep CHGCAR fixed for NSCF.
+"""
 
------------------------------------------------------------------------------"""
+import argparse
+import json
+import multiprocessing
+import re
+import shutil
+from itertools import groupby
+from pathlib import Path
 
-import seekpath, json
 import numpy as np
-import os, pathlib, multiprocessing, argparse
-from omegaconf import OmegaConf
-from pymatgen.core import Structure
-from pymatgen.io.vasp.inputs import Incar, Poscar, Potcar, Kpoints
-from pymatgen.core import Structure, Lattice
-from edengnn.data.io.vasp.basis import pseudo_map
-
-CELL_ILL_CONDITION = 0.15
-DK_BAND = 0.037
+import seekpath
+from pymatgen.core import Element, Structure
 
 
-def write_kpath(structure_, dk_band):
-    """
-    write K points along high-symmetry lines
-    """
-    # --------------------------------------------------------------------------
-    # make sure the input structure is primitive
-    # --------------------------------------------------------------------------
-    cell = structure_.lattice.matrix
-    positions = structure_.frac_coords
-    numbers = [site.specie.number for site in structure_]
-    sp_res = seekpath.get_path(
-        (cell, positions, numbers),
+def write_potcar(path, elements, pseudo_files):
+    """Concatenate the selected POTCAR files in POSCAR species-block order."""
+    with open(path, "wb") as target:
+        for element in elements:
+            with open(pseudo_files[element]["path_pp"], "rb") as source:
+                shutil.copyfileobj(source, target)
+
+
+def _poscar_header(z, cell, pos):
+    """Return a POSCAR header and species blocks in the original atom order."""
+    symbols = [Element.from_Z(int(number)).symbol for number in z]
+    species_counts = [(symbol, len(list(sites))) for symbol, sites in groupby(symbols)]
+    lines = ["EdenGNN", "1.0"]
+    lines.extend(" ".join(f"{value:.16f}" for value in vector) for vector in cell)
+    lines.append(" ".join(symbol for symbol, _ in species_counts))
+    lines.append(" ".join(str(count) for _, count in species_counts))
+    lines.append("Direct")
+    lines.extend(
+        " ".join(f"{value:.16f}" for value in position)
+        for position in pos @ np.linalg.inv(cell)
     )
-
-    structure = Structure(
-        lattice=Lattice(sp_res["primitive_lattice"]),
-        species=sp_res["primitive_types"],
-        coords=sp_res["primitive_positions"],
-        coords_are_cartesian=False,
-    )
-    # --------------------------------------------------------------------------
-    # Using the Explicit k-point mesh mode of KPOINTS
-    # --------------------------------------------------------------------------
-    r_cell = structure.lattice.reciprocal_lattice.matrix
-    k_path = sp_res["path"]
-    k_coords = sp_res["point_coords"]
-
-    nk_total = 0
-    lines_kcoords = ""
-    header = []
-    for start_label, end_label in k_path:
-        k1_frac = np.array(k_coords[start_label])
-        k2_frac = np.array(k_coords[end_label])
-
-        k1_cart = np.dot(k1_frac, r_cell)
-        k2_cart = np.dot(k2_frac, r_cell)
-
-        dist = np.linalg.norm(k2_cart - k1_cart)
-
-        nk = max(2, int(np.round(dist / dk_band)))
-
-        header.append([start_label, end_label, nk])
-        nk_total += nk
-        kcoords = np.linspace(k1_frac, k2_frac, nk)
-        for kcoord in kcoords:
-            lines_kcoords += f"{kcoord[0]:6f}  {kcoord[1]:6f}  {kcoord[2]:6f}   1\n"
-
-    header = json.dumps(header)
-    lines = f"{header}\n{nk_total}\n" + "Reciprocal\n" + lines_kcoords
-    return structure, lines
+    return "\n".join(lines) + "\n", [symbol for symbol, _ in species_counts]
 
 
-def _vasp_sad(structure_in, dir_work, cfg):
-    """
-    If the goal is to perform band structure calculations, the structure is
-    transformed to the standardized primitive cell used by seekpath.
-    Ill-conditioned primitive cells are excluded for plane-wave band calculations.
-    see "Comp. Mat. Sci. 128, 140 (2017). DOI: 10.1016/j.commatsci.2016.10.015"
-    """
 
-    if cfg.sad.for_band:
-        structure, lines = write_kpath(structure_in, DK_BAND)
-
-        # check if the primitive structure is PW friendly
-        cell = structure.lattice.matrix
-        volume = structure.volume
-        a = np.linalg.norm(cell[0])
-        b = np.linalg.norm(cell[1])
-        c = np.linalg.norm(cell[2])
-        shape_factor = volume / (a * b * c)
-        if shape_factor < CELL_ILL_CONDITION:
-            print(
-                f"bad structure for band calculations: {dir_work}\n shape factor: {shape_factor}",
-                flush=True,
-            )
-            return None
-        else:
-            print(f"{dir_work} shape factor: {shape_factor}", flush=True)
-            os.makedirs(dir_work, exist_ok=True)
-            # generate kpoints file and high symmetry points for band structure calculations
-            with open(os.path.join(dir_work, "KPOINTS_BAND"), "w") as f:
-                f.write(lines)
-
-    else:
-        os.makedirs(dir_work, exist_ok=True)
-        structure = structure_in
-
-    poscar = Poscar(structure)
-
-    potcar_symbols = list(
-        dict.fromkeys([pseudo_map[i] for i in structure.atomic_numbers])
-    )
-    potcar = Potcar(potcar_symbols, functional="PBE")
-
-    incar_dict = {
-        "PREC": "Normal",
-        "ISMEAR": 0,
-        "SYSTEM": "SAD",
-        "ICHARG": 12,
-        "IBRION": -1,
-        "NSW": 0,
-        "NELM": 0,
-        "LWAVE": False,
-        "LCHARG": True,
-        "LREAL": "Auto",
-        "NCORE": 4,
-        "SYMPREC": 1e-8,
-    }
-    if cfg.incar.get("encut"):
-        incar_dict["ENCUT"] = cfg.incar.get("encut")
-    incar = Incar(incar_dict)
-    kpoints = Kpoints.gamma_automatic(kpts=[1, 1, 1])
-
-    poscar.write_file(os.path.join(dir_work, "POSCAR"))
-    potcar.write_file(os.path.join(dir_work, "POTCAR"))
-    incar.write_file(os.path.join(dir_work, "INCAR"))
-    kpoints.write_file(os.path.join(dir_work, "KPOINTS"))
+def write_kpath(path, cell, k_coords, k_path, dk_band):
+    """Write explicit primitive-cell band k-points with spacing in inverse angstrom."""
+    reciprocal = 2 * np.pi * np.linalg.inv(cell).T
+    segments = []
+    points = []
+    for start, end in k_path:
+        k1 = np.asarray(k_coords[start])
+        k2 = np.asarray(k_coords[end])
+        distance = np.linalg.norm((k2 - k1) @ reciprocal)
+        n_points = max(2, int(np.ceil(distance / dk_band)))
+        segments.append([start, end, n_points])
+        points.extend(np.linspace(k1, k2, n_points))
+    with open(path, "w") as f:
+        f.write(f"{json.dumps(segments)}\n{len(points)}\nReciprocal\n")
+        for point in points:
+            f.write(" ".join(f"{value:.12f}" for value in point) + " 1\n")
 
 
-def vasp_run(path_poscar, cfg):
-    name = pathlib.Path(path_poscar).stem
-    structure = Structure.from_file(path_poscar)
-    dir_work = os.path.join(cfg.sad.save_dir, name)
-    _vasp_sad(structure, os.path.join(cfg.sad.save_dir, name), cfg)
+def vasp_run(path_structure, args, pseudo_files):
+    """Read one structure and write a Gamma-only SAD calculation directory."""
+    structure = Structure.from_file(path_structure)
+    cell = structure.lattice.matrix
+    fractional = structure.frac_coords
+    z = np.asarray(structure.atomic_numbers)
+    if args.for_band:
+        band_path = seekpath.get_path((cell, fractional, z))
+        cell = np.asarray(band_path["primitive_lattice"])
+        fractional = np.asarray(band_path["primitive_positions"])
+        z = np.asarray(band_path["primitive_types"])
+        shape_factor = abs(np.linalg.det(cell)) / np.prod(np.linalg.norm(cell, axis=1))
+        if shape_factor < 0.15:
+            print(f"Skipping {path_structure}: primitive-cell shape factor {shape_factor:.6f}", flush=True)
+            return
+
+    path = Path(args.save_dir) / Path(path_structure).stem
+    path.mkdir(parents=True, exist_ok=True)
+    header, elements = _poscar_header(z, cell, fractional @ cell)
+    (path / "POSCAR").write_text(header)
+    write_potcar(path / "POTCAR", elements, pseudo_files)
+    with (path / "INCAR").open("w") as f:
+        for key, value in args.input_parameters.items():
+            f.write(f"{key} = {value}\n")
+    (path / "KPOINTS").write_text("Gamma mesh\n0\nGamma\n1 1 1\n0 0 0\n")
+    if args.for_scf:
+        reciprocal = 2 * np.pi * np.linalg.inv(cell).T
+        k_grid = np.maximum(
+            np.ceil(np.round(np.linalg.norm(reciprocal, axis=1) / args.dk_bz, 5)), 1
+        ).astype(int)
+        with (path / "KPOINTS_SCF").open("w") as f:
+            f.write("Gamma mesh\n0\nGamma\n")
+            f.write(" ".join(map(str, k_grid)) + "\n0 0 0\n")
+    if args.for_band:
+        write_kpath(path / "KPOINTS_BAND", cell, band_path["point_coords"], band_path["path"], args.dk_band)
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--config", type=str, required=True, help="Path to the config file"
-    )
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--filelist", required=True, type=Path, help="Text list of structure paths")
+    parser.add_argument("--save-dir", required=True, type=Path, help="Output directory")
+    parser.add_argument("--path-pp", required=True, type=Path, help="POTCAR JSON mapping")
+    parser.add_argument("--path-input", required=True, type=Path, help="INCAR parameter template")
+    parser.add_argument("--nproc", type=int, default=64, help="Parallel input-generation processes (default: 64)")
+    parser.add_argument("--for-scf", action="store_true", help="Also write KPOINTS_SCF mesh")
+    parser.add_argument("--dk-bz", type=float, default=0.15, help="Mesh spacing in inverse angstrom (default: 0.15)")
+    parser.add_argument("--for-band", action="store_true", help="Use primitive cell and write band k-points")
+    parser.add_argument("--dk-band", type=float, default=0.037, help="Band spacing in inverse angstrom (default: 0.037)")
     args = parser.parse_args()
-    cfg = OmegaConf.load(args.config)
+    args.input_parameters = {}
+    with args.path_input.open() as f:
+        for line in f:
+            line = re.split(r"#|!", line, maxsplit=1)[0]
+            for assignment in line.split(";"):
+                if not assignment.strip():
+                    continue
+                key, value = assignment.split("=", 1)
+                args.input_parameters[key.strip().upper()] = value.strip()
+    args.input_parameters.update(ICHARG=12, NELM=0)
+    path_pp = args.path_pp.expanduser().resolve()
+    with path_pp.open() as f:
+        pseudo_files = json.load(f)
+    for entry in pseudo_files.values():
+        source = Path(entry["path_pp"]).expanduser()
+        if not source.is_absolute():
+            source = path_pp.parent / source
+        entry["path_pp"] = str(source)
+    with args.filelist.open() as f:
+        paths = [line.strip() for line in f if line.strip()]
+    if args.nproc == 1:
+        for path in paths:
+            vasp_run(path, args, pseudo_files)
+    else:
+        with multiprocessing.Pool(min(multiprocessing.cpu_count(), args.nproc)) as pool:
+            pool.starmap(vasp_run, [(path, args, pseudo_files) for path in paths])
 
-    with open(cfg.sad.get("filelist"), "r") as f:
-        filelist = [line.strip() for line in f if line.strip()]
 
-    nproc = min(multiprocessing.cpu_count(), cfg.run.nproc)
-    with multiprocessing.Pool(processes=nproc) as pool:
-        pool.starmap(vasp_run, [(path_poscar, cfg) for path_poscar in filelist])
-
-
-main()
+if __name__ == "__main__":
+    main()
