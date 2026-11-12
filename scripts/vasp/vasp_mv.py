@@ -1,6 +1,6 @@
 """-----------------------------------------------------------------------------
 
-move CHGCAR to training dir
+Convert to binary format for training density and augmentation separately.
 
 Usage: python vasp_mv.py --config config_vasp.yaml
 

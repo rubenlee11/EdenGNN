@@ -1,0 +1,269 @@
+{
+  "H": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/H/POTCAR"
+  },
+  "He": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/He/POTCAR"
+  },
+  "Li": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Li_sv/POTCAR"
+  },
+  "Be": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Be_sv/POTCAR"
+  },
+  "B": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/B/POTCAR"
+  },
+  "C": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/C/POTCAR"
+  },
+  "N": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/N/POTCAR"
+  },
+  "O": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/O/POTCAR"
+  },
+  "F": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/F/POTCAR"
+  },
+  "Ne": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ne/POTCAR"
+  },
+  "Na": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Na_pv/POTCAR"
+  },
+  "Mg": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Mg_pv/POTCAR"
+  },
+  "Al": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Al/POTCAR"
+  },
+  "Si": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Si/POTCAR"
+  },
+  "P": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/P/POTCAR"
+  },
+  "S": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/S/POTCAR"
+  },
+  "Cl": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Cl/POTCAR"
+  },
+  "Ar": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ar/POTCAR"
+  },
+  "K": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/K_sv/POTCAR"
+  },
+  "Ca": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ca_sv/POTCAR"
+  },
+  "Sc": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Sc_sv/POTCAR"
+  },
+  "Ti": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ti_pv/POTCAR"
+  },
+  "V": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/V_pv/POTCAR"
+  },
+  "Cr": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Cr_pv/POTCAR"
+  },
+  "Mn": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Mn_pv/POTCAR"
+  },
+  "Fe": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Fe_pv/POTCAR"
+  },
+  "Co": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Co/POTCAR"
+  },
+  "Ni": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ni_pv/POTCAR"
+  },
+  "Cu": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Cu_pv/POTCAR"
+  },
+  "Zn": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Zn/POTCAR"
+  },
+  "Ga": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ga_d/POTCAR"
+  },
+  "Ge": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ge_d/POTCAR"
+  },
+  "As": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/As/POTCAR"
+  },
+  "Se": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Se/POTCAR"
+  },
+  "Br": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Br/POTCAR"
+  },
+  "Kr": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Kr/POTCAR"
+  },
+  "Rb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Rb_sv/POTCAR"
+  },
+  "Sr": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Sr_sv/POTCAR"
+  },
+  "Y": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Y_sv/POTCAR"
+  },
+  "Zr": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Zr_sv/POTCAR"
+  },
+  "Nb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Nb_pv/POTCAR"
+  },
+  "Mo": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Mo_pv/POTCAR"
+  },
+  "Tc": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Tc_pv/POTCAR"
+  },
+  "Ru": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ru_pv/POTCAR"
+  },
+  "Rh": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Rh_pv/POTCAR"
+  },
+  "Pd": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pd/POTCAR"
+  },
+  "Ag": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ag/POTCAR"
+  },
+  "Cd": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Cd/POTCAR"
+  },
+  "In": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/In_d/POTCAR"
+  },
+  "Sn": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Sn_d/POTCAR"
+  },
+  "Sb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Sb/POTCAR"
+  },
+  "Te": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Te/POTCAR"
+  },
+  "I": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/I/POTCAR"
+  },
+  "Xe": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Xe/POTCAR"
+  },
+  "Cs": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Cs_sv/POTCAR"
+  },
+  "Ba": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ba_sv/POTCAR"
+  },
+  "La": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/La/POTCAR"
+  },
+  "Ce": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ce/POTCAR"
+  },
+  "Pr": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pr_3/POTCAR"
+  },
+  "Nd": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Nd_3/POTCAR"
+  },
+  "Pm": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pm_3/POTCAR"
+  },
+  "Sm": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Sm_3/POTCAR"
+  },
+  "Eu": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Eu/POTCAR"
+  },
+  "Gd": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Gd/POTCAR"
+  },
+  "Tb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Tb_3/POTCAR"
+  },
+  "Dy": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Dy_3/POTCAR"
+  },
+  "Ho": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ho_3/POTCAR"
+  },
+  "Er": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Er_3/POTCAR"
+  },
+  "Tm": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Tm_3/POTCAR"
+  },
+  "Yb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Yb_3/POTCAR"
+  },
+  "Lu": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Lu_3/POTCAR"
+  },
+  "Hf": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Hf_pv/POTCAR"
+  },
+  "Ta": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ta_pv/POTCAR"
+  },
+  "W": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/W_pv/POTCAR"
+  },
+  "Re": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Re_pv/POTCAR"
+  },
+  "Os": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Os_pv/POTCAR"
+  },
+  "Ir": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ir/POTCAR"
+  },
+  "Pt": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pt/POTCAR"
+  },
+  "Au": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Au/POTCAR"
+  },
+  "Hg": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Hg/POTCAR"
+  },
+  "Tl": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Tl_d/POTCAR"
+  },
+  "Pb": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pb_d/POTCAR"
+  },
+  "Bi": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Bi/POTCAR"
+  },
+  "Ac": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Ac/POTCAR"
+  },
+  "Th": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Th/POTCAR"
+  },
+  "Pa": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pa/POTCAR"
+  },
+  "U": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/U/POTCAR"
+  },
+  "Np": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Np/POTCAR"
+  },
+  "Pu": {
+    "path_pp": "/root/tools/vasp/POT_GGA_PAW_PBE/Pu/POTCAR"
+  }
+}

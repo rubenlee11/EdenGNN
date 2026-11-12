@@ -1,27 +1,19 @@
-"""-----------------------------------------------------------------------------
+"""VASP density IO using SAD CHGCAR input for delta learning."""
 
-VASP IO
+import json
+import os
+import pathlib
+import re
+from itertools import groupby
 
-I abandoned varied LMAX_MIX for structures in dataset, the sampling probability
-of large L might be too low.
-
------------------------------------------------------------------------------"""
-
-import os, re, pathlib
-from pymatgen.core import Structure
 import numpy as np
-from pymatgen.io.vasp.inputs import Poscar
 from pymatgen.core import Element
 from edengnn.data.io.io_chgcar import io_chgcar
 from edengnn.data.io.vasp.basis import (
     AUG_BASIS,
     I1I2_IDX,
     LEN_AUG_TENSOR,
-    aug_basis_dict,
-    aug_basis_idx_dict,
-    aug_basis_len_dict,
-    pseudo_map,
-    nelec_dict,
+    read_basis,
 )
 
 
@@ -32,96 +24,36 @@ class IO_VASP:
         save_dir="",
         dir="",
         use_bin=False,
-        path_template="",
-        encut=220,
         lmix_max=6,
-        dk_bz=0.35,
-        dk_band=0.05,
-        plot_band=True,
+        path_pp=None,
     ):
         self.stage = stage
-        if self.stage == "predict":
-            path_predict = os.path.join(save_dir, "predict")
-            os.makedirs(path_predict, exist_ok=True)
-            self.save_dir = path_predict
-        self.encut = encut
-        self.dk_bz = dk_bz
-        self.dk_band = dk_band
+        self.save_dir = pathlib.Path(save_dir) / "predict"
         self.lmix_max = lmix_max
-        self.plot_band = plot_band
-        self.path_template = path_template
         self.dir = dir
         self.use_bin = use_bin
-
-        # if self.path_template is not None:
-        #    with open(self.path_template, "r") as f:
-        #        self.incar_head = f.read()
-        # else:
-        #    self.incar_head = ""
-        return
+        path_pp = pathlib.Path(path_pp)
+        with path_pp.open() as f:
+            self.pseudo_files = json.load(f)
+        for entry in self.pseudo_files.values():
+            source = pathlib.Path(entry["path_pp"])
+            if not source.is_absolute():
+                source = path_pp.parent / source
+            entry["path_pp"] = str(source)
+        self.basis = read_basis(self.pseudo_files)
 
     def read_data(self, path):
         name = pathlib.Path(path).stem
-        """
-        if self.use_bin:
-            structure = Structure.from_file(os.path.join(path, "POSCAR"))
-            density_in = (
-                np.load(os.path.join(path, "density.npy")) / structure.lattice.volume
-            )
-            aug_lines_in = np.load(os.path.join(path, "aug.npz"), allow_pickle=True)[
-                "data_aug"
-            ].item()["total"]
-            if self.stage == "train":
-                path_scf = os.path.join(self.dir, f"{name}")
-                density = (
-                    np.load(os.path.join(path_scf, "density.npy"))
-                    / structure.lattice.volume
-                )
-                aug_lines = np.load(
-                    os.path.join(path_scf, "aug.npz"), allow_pickle=True
-                )["data_aug"].item()["total"]
-
-            z = structure.atomic_numbers
-        else:
-            chgcar_sad = Chgcar.from_file(os.path.join(path, "CHGCAR"))
-            structure = chgcar_sad.structure
-            z = structure.atomic_numbers
-            density_in = chgcar_sad.data["total"] / structure.lattice.volume
-            aug_lines_in = chgcar_sad.data_aug["total"]
-            aug_tensor_in, aug_mask = parse_aug(aug_lines_in, z, self.lmix_max)
-            aug_tensor = None
-            density = None
-            if self.stage == "train":
-                chgcar = Chgcar.from_file(os.path.join(self.dir, f"{name}", "CHGCAR"))
-                density = chgcar.data["total"] / structure.lattice.volume
-                aug_lines = chgcar.data_aug["total"]
-                aug_tensor, aug_mask = parse_aug(aug_lines, z, self.lmix_max)
-
-        pos = structure.cart_coords
-        cell = structure.lattice.matrix
-        nelec = sum(nelec_dict[pseudo_map[z]] for z in structure.atomic_numbers)
-        """
+        path_sad = os.path.join(path, "CHGCAR")
+        z, cell, pos, volume, density_sad, aug_str = _read_chgcar(path_sad)
+        n1, n2, n3 = density_sad.shape
+        density = None
+        nelec = 0.0
         if self.stage == "train":
-            path_td = os.path.join(self.dir, f"{name}", "CHGCAR")
-            z, cell, pos, volume, density_td, aug_str = _read_chgcar(path_td)
-            z, cell, pos, volume, density_sad, _aug_str = _read_chgcar(
-                os.path.join(path, "CHGCAR")
-            )
-
-            density = density_td
-            n1, n2, n3 = density.shape
+            path_td = os.path.join(self.dir, name, "CHGCAR")
+            _, _, _, _, density, aug_str = _read_chgcar(path_td)
             nelec = np.sum(density_sad) * volume / (n1 * n2 * n3)
-
-            aug_tensor, aug_mask = parse_aug(aug_str, z, self.lmix_max)
-
-        elif self.stage == "predict":
-            z, cell, pos, volume, density_sad, aug_str = _read_chgcar(
-                os.path.join(path, "CHGCAR")
-            )
-            aug_tensor, aug_mask = parse_aug(aug_str, z, self.lmix_max)
-            nelec = 0.0
-            n1, n2, n3 = density_sad.shape
-            density = None
+        aug_tensor, aug_mask = parse_aug(aug_str, z, self.lmix_max, self.basis)
         return (
             name,
             cell,
@@ -137,54 +69,36 @@ class IO_VASP:
         )
 
     def write_density(self, name, aug_tensor, density, z, pos, cell, volume):
-        path = os.path.join(self.save_dir, name)
-        structure = Structure(
-            lattice=cell,
-            species=z,
-            coords=pos,
-            coords_are_cartesian=True,
-        )
-        poscar = Poscar(structure)
-
-        if density is None:
-            pass
-        else:
-            # write header
+        """Write predicted charge density and/or augmentation occupancies."""
+        self.save_dir.mkdir(parents=True, exist_ok=True)
+        path = str(self.save_dir / name)
+        if density is not None:
+            symbols = [Element.from_Z(int(number)).symbol for number in z]
+            species_counts = [
+                (symbol, len(list(sites))) for symbol, sites in groupby(symbols)
+            ]
             with open(path, "w") as f:
-                lines = f"CHGCAR generated by EdenGNN\n"
-                lines += "   1.00000000000000\n"
-                for vec in structure.lattice.matrix:
-                    lines += f" {vec[0]:12.6f}{vec[1]:12.6f}{vec[2]:12.6f}\n"
-                lines += "".join(f"{s:5}" for s in poscar.site_symbols) + "\n"
-                lines += "".join(f"{x:6}" for x in poscar.natoms) + "\n"
-                lines += "Direct\n"
-                for site in structure:
-                    a, b, c = site.frac_coords
-                    lines += f"{a:10.6f}{b:10.6f}{c:10.6f}\n"
-                lines += " \n"
-                f.write(lines)
-
+                f.write("CHGCAR generated by EdenGNN\n1.0\n")
+                for vector in cell:
+                    f.write(" ".join(f"{value:.16f}" for value in vector) + "\n")
+                f.write(" ".join(symbol for symbol, _ in species_counts) + "\n")
+                f.write(" ".join(str(count) for _, count in species_counts) + "\nDirect\n")
+                for position in pos @ np.linalg.inv(cell):
+                    f.write(" ".join(f"{value:.16f}" for value in position) + "\n")
                 n1, n2, n3 = density.shape
-                f.write(f"   {n1}   {n2}   {n3}\n")
-
-            # write density
+                f.write(f"\n{n1} {n2} {n3}\n")
             data = (density * volume).flatten(order="F")
             io_chgcar.write_density(data, n1 * n2 * n3, path)
-
-        # write augmentation occupancy
-        if aug_tensor is None:
-            pass
-        else:
-            aug_list, nele_list = irreps2aug(aug_tensor, z, self.lmix_max)
+        if aug_tensor is not None:
+            aug_list, nele_list = irreps2aug(aug_tensor, z, self.lmix_max, self.basis)
             io_chgcar.write_aug(aug_list, path, nele_list)
-
-        return None
 
 
 def aug2irreps(
     z,
     aug_vasp,
     lmix_max,
+    basis,
 ):
     """-------------------------------------------------------------------------
     Description:
@@ -215,8 +129,8 @@ def aug2irreps(
             counter for haw many element have been embedded into aug_tensor
     -------------------------------------------------------------------------"""
 
-    aug_basis = aug_basis_dict[pseudo_map[z]]
-    aug_basis_idx = aug_basis_idx_dict[pseudo_map[z]]
+    aug_basis = basis[z]["angular_momenta"]
+    aug_basis_idx = basis[z]["indices"]
 
     aug_tensor_compact = []
     ibase = 0
@@ -261,7 +175,7 @@ def aug2irreps(
     return aug_tensor, aug_mask
 
 
-def irreps2aug(aug_tensor_list, z, lmix_max=2):
+def irreps2aug(aug_tensor_list, z, lmix_max, basis):
     """-------------------------------------------------------------------------
 
     Description:
@@ -275,9 +189,8 @@ def irreps2aug(aug_tensor_list, z, lmix_max=2):
     for i, z_atom in enumerate(z):
         aug_tensor = aug_tensor_list[i]
 
-        pseudo = pseudo_map[z_atom]
-        aug_basis_idx = aug_basis_idx_dict[pseudo]
-        aug_vasp_len = aug_basis_len_dict[pseudo]
+        aug_basis_idx = basis[z_atom]["indices"]
+        aug_vasp_len = basis[z_atom]["n_aug"]
 
         aug_vasp = [0] * aug_vasp_len
 
@@ -306,7 +219,7 @@ def irreps2aug(aug_tensor_list, z, lmix_max=2):
     return aug_list, nele_list
 
 
-def parse_aug(lines, z, lmix_max=2):
+def parse_aug(lines, z, lmix_max, basis):
     # Read and parse augmentation occupancies.
     # pymatgen has bug reading aug, I need to modify a little bit
     aug_num = []
@@ -334,7 +247,7 @@ def parse_aug(lines, z, lmix_max=2):
     aug_tensor_list = []
     aug_mask_list = []
     for i in range(len(z)):
-        aug_tensor, aug_mask = aug2irreps(z[i], aug_list[i], lmix_max)
+        aug_tensor, aug_mask = aug2irreps(z[i], aug_list[i], lmix_max, basis)
         aug_tensor_list.append(aug_tensor)
         aug_mask_list.append(aug_mask)
     return np.array(aug_tensor_list), np.array(aug_mask_list)

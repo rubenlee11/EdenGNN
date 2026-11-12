@@ -1,5 +1,33 @@
-import os, pathlib
+r"""Plot ABACUS bands and, when nscf/ exists, the total density of states.
+
+Usage (activate the eqgnn environment first):
+    python scripts/abacus/plot_band.py \
+        --filelist /path/to/structure_dirs.txt \
+        --prefix EDENGNN --ylim -4 4 --dpi 300 --nproc 4
+
+Inputs:
+    --filelist Required list of structure calculation directories, one per line.
+    --band-dir Band calculation subdirectory (default: band).
+    --prefix   OUT.<suffix> suffix for band and NSCF outputs (default: EDENGNN).
+    --ylim     Energy limits relative to the band Fermi energy, in eV (default: -4 4).
+    --dpi      Image resolution (default: 300).
+    --nproc    Parallel plotting processes (default: 1).
+
+Reads band/STRU, band/KPT (Line mode), and
+band/OUT.<suffix>/{BANDS_1.dat,running_nscf.log}.
+If nscf/ exists, reads nscf/OUT.<suffix>/TDOS.dat (LCAO out_dos=2) and draws
+the total DOS beside the bands. Spin channels in TDOS.dat are summed.
+Both panels use the band calculation's Fermi energy as zero.
+Saves band.png in each listed directory. Use stat.py for target comparisons.
+"""
+
+import argparse
+import multiprocessing
+import os
+import pathlib
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from ase.io import read
 
@@ -38,12 +66,7 @@ def parse_kpt(kpt_path):
 
 
 def parse_band(dir, prefix, ax, color="b"):
-    name = pathlib.Path(dir).stem
-    try:
-        data = np.loadtxt(os.path.join(dir, f"OUT.{prefix}", "BANDS_1.dat"))
-    except:
-        print(f"error with {name}")
-        return None, None
+    data = np.loadtxt(os.path.join(dir, f"OUT.{prefix}", "BANDS_1.dat"))
     bands = data[:, 2:]
 
     ef = get_fermi_energy(os.path.join(dir, f"OUT.{prefix}", "running_nscf.log"))
@@ -144,21 +167,57 @@ def parse_band(dir, prefix, ax, color="b"):
     return bands, ef
 
 
-path_dir = "/public/home/lixiwen/dataset/universal_abacus/mc3d/dataset_test_gnome.txt"
-with open(path_dir, "r") as f:
-    paths = [line.strip() for line in f]
+def plot_band(dir_work, args):
+    """Save bands and optional total DOS with a shared Fermi-energy reference."""
+    dir_work = pathlib.Path(dir_work)
+    path_nscf = dir_work / "nscf"
+    has_dos = path_nscf.is_dir()
+    if has_dos:
+        dos = np.loadtxt(path_nscf / f"OUT.{args.prefix}" / "TDOS.dat")
+        fig, (ax, ax_dos) = plt.subplots(
+            1, 2, figsize=(6, 4), sharey=True,
+            gridspec_kw={"width_ratios": [3, 1], "wspace": 0.05},
+        )
+    else:
+        fig, ax = plt.subplots(figsize=(4, 4))
+    try:
+        _, ef = parse_band(dir_work / args.band_dir, args.prefix, ax, color="b")
+        ax.set_ylim(*args.ylim)
+        if has_dos:
+            ax_dos.plot(dos[:, 1:].sum(axis=1), dos[:, 0] - ef, color="b", linewidth=1)
+            ax_dos.axhline(0, color="gray", linewidth=0.5)
+            ax_dos.set_xlabel("DOS (states/eV)")
+            ax_dos.set_xlim(left=0)
+            ax_dos.tick_params(axis="y", left=False)
+            fig.subplots_adjust(left=0.14, right=0.97, bottom=0.18, top=0.97)
+        else:
+            fig.tight_layout()
+        fig.savefig(dir_work / "band.png", dpi=args.dpi)
+    finally:
+        plt.close(fig)
 
-for path in paths:
-    fig, ax = plt.subplots(figsize=(4, 4))
-    plt.title("Electronic Band Structure", fontsize=16)
-    plt.tight_layout()
 
-    bands_pre, ef_pre = parse_band(
-        path,
-        "aiida",
-        ax,
-        color="b",
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    plt.show()
-    plt.savefig(os.path.join(path, "band.png"), dpi=300)
-    plt.close()
+    parser.add_argument("--filelist", required=True, type=pathlib.Path, help="List of structure calculation directories")
+    parser.add_argument("--band-dir", default="band", help="Band calculation subdirectory (default: band)")
+    parser.add_argument("--prefix", default="EDENGNN", help="Calculation suffix (default: EDENGNN)")
+    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Energy limits in eV relative to Ef (default: -4 4)")
+    parser.add_argument("--dpi", type=int, default=300, help="Image resolution (default: 300)")
+    parser.add_argument("--nproc", type=int, default=1, help="Parallel plotting processes (default: 1)")
+    args = parser.parse_args()
+
+    with args.filelist.open() as f:
+        paths = [line.strip() for line in f if line.strip()]
+    if args.nproc == 1:
+        for path in paths:
+            plot_band(path, args)
+    else:
+        with multiprocessing.Pool(min(multiprocessing.cpu_count(), args.nproc)) as pool:
+            pool.starmap(plot_band, [(path, args) for path in paths])
+
+
+if __name__ == "__main__":
+    main()

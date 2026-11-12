@@ -26,6 +26,7 @@ def get_loader(cfg, stage, io_dft):
             lmix_max=cfg.model.lmix_max,
             stage=stage,
             use_bin=cfg.data.use_bin,
+            io_dft=io_dft,
         )
     elif cfg.model.task == 0 or cfg.model.task == 2:
         dataset = DensityDataset(
@@ -62,10 +63,19 @@ class AugDataset(torch.utils.data.Dataset):
     """ """
 
     def __init__(
-        self, dir, split, cutoff, radius, lmix_max=6, stage="train", use_bin=True
+        self,
+        dir,
+        split,
+        cutoff,
+        radius,
+        lmix_max=6,
+        stage="train",
+        use_bin=True,
+        io_dft=None,
     ):
         self.cutoff = cutoff
         self.radius = radius
+        self.io_dft = io_dft
 
         with open(split, "r") as f:
             self.paths = [line.strip() for line in f]
@@ -114,10 +124,14 @@ class AugDataset(torch.utils.data.Dataset):
         nbr_shift = cell_shift @ cell  # convert to Cartesian
 
         if not self.stage_predict:
-            aug_tensor, aug_mask = parse_aug(aug_lines, z, self.lmix_max)
+            aug_tensor, aug_mask = parse_aug(
+                aug_lines, z, self.lmix_max, self.io_dft.basis
+            )
         else:
             aug_tensor = None
-        aug_tensor_in, aug_mask = parse_aug(aug_lines_in, z, self.lmix_max)
+        aug_tensor_in, aug_mask = parse_aug(
+            aug_lines_in, z, self.lmix_max, self.io_dft.basis
+        )
 
         return Data(
             z=torch.tensor(z, dtype=torch.long),

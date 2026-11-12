@@ -1,36 +1,36 @@
-import glob
+r"""Plot VASP bands and, when nscf/ exists, the total density of states.
+
+Usage (activate the eqgnn environment first):
+    python scripts/vasp/plot_band.py \
+        --filelist /path/to/structure_dirs.txt --ylim -4 4 --dpi 300 --nproc 4
+
+Inputs:
+    --filelist Required list of structure calculation directories, one per line.
+    --band-dir Band calculation subdirectory (default: band).
+    --ylim     Energy limits in eV (default: -4 4).
+    --dpi      Image resolution (default: 300).
+    --nproc    Parallel plotting processes (default: 1).
+
+Reads band/vasprun.xml and band/KPOINTS. Supports explicit JSON-header KPOINTS
+from vasp_sad.py and standard VASP Line-mode KPOINTS. If nscf/ exists, reads
+nscf/vasprun.xml and draws the total DOS beside the bands, sharing the energy
+axis. Both use the band calculation's VBM (Fermi energy for metals) as zero.
+Saves band.png in each listed directory. Use stat.py for target comparisons.
+"""
+
+import argparse
 import json
 import multiprocessing
 import os
-import pathlib
+from pathlib import Path
 
-import matplotlib.gridspec as gridspec
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from ase.data.colors import jmol_colors
-from ase.io import read
-from ase.visualize.plot import plot_atoms
-from matplotlib.lines import Line2D
 from pymatgen.electronic_structure.core import Spin
 from pymatgen.electronic_structure.plotter import BSPlotter
 from pymatgen.io.vasp.outputs import Vasprun
-
-color_tar = "red"
-color_pre = "blue"
-color_parity = "#AAA486"
-color_baseline = "black"
-
-dirs = glob.glob("/root/dataset/gnome/compare_edengnn_hamgnn/vasp_run_predict/*")
-path_save = "/root/dataset/gnome/compare_edengnn_hamgnn/stat_band_edengnn.json"
-
-
-def get_band_index_window(evbm, eigen, width_lower=4.0):
-    threshold = evbm - width_lower
-    fully_above = np.all(eigen > threshold, axis=1)
-    indices = np.where(fully_above)[0]
-    if len(indices) == 0:
-        return 0, eigen.shape[0]
-    return int(indices[0]), eigen.shape[0]
 
 
 def _append_tick(tick_positions, tick_labels, position, label):
@@ -177,7 +177,7 @@ def get_band_data(workdir):
         bs_line = vr.get_band_structure(line_mode=True)
         plot_data = BSPlotter(bs_line).bs_plot_data(zero_to_efermi=False)
         distances = plot_data["distances"]
-        energies = [np.array(item) for item in plot_data["energy"]["1"]]
+        energies = [np.array(item).T for item in plot_data["energy"]["1"]]
         tick_info = BSPlotter(bs_line).get_ticks()
         tick_positions = []
         tick_labels = []
@@ -197,222 +197,70 @@ def get_band_data(workdir):
     }
 
 
-def get_energy_per_atom(workdir):
-    vr = Vasprun(
-        os.path.join(workdir, "vasprun.xml"),
-        parse_dos=False,
-        parse_eigen=False,
-        parse_potcar_file=False,
-    )
-    return float(vr.final_energy) / len(vr.structures[-1])
 
-
-def plot_parity_band(ax, pre, tar):
-    pre = np.asarray(pre).ravel()
-    tar = np.asarray(tar).ravel()
-    r2 = 1.0 - np.sum((pre - tar) ** 2) / np.sum((pre - tar.mean()) ** 2)
-
-    ax.plot(
-        [tar.min(), tar.max()],
-        [tar.min(), tar.max()],
-        color=color_baseline,
-        linestyle="--",
-        lw=1.0,
-        zorder=10,
-    )
-    ax.scatter(
-        tar,
-        pre,
-        s=12,
-        color=color_parity,
-        zorder=2,
-        alpha=0.2,
-        edgecolors="none",
-    )
-
-    ax.set_xlabel(r"$\varepsilon_{nk}$ $(\mathrm{eV})$")
-    ax.set_ylabel(r"$\hat{\varepsilon}_{nk}$ $(\mathrm{eV})$")
-    ax.tick_params(direction="in")
-    ax.text(
-        0.05,
-        0.95,
-        rf"$R^2 = {r2:.5f}$",
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-    )
-
-
-def plot_atoms_ase(ax, atoms):
-    plot_atoms(atoms, ax, radii=0.5, rotation=("45x,45y,0z"))
-    ax.set_axis_off()
-
-    unique_elements = {}
-    for atom in atoms:
-        if atom.symbol not in unique_elements:
-            unique_elements[atom.symbol] = atom.number
-    sorted_symbols = sorted(unique_elements.keys())
-
-    legend_elements = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="w",
-            label=sym,
-            markerfacecolor=jmol_colors[unique_elements[sym]],
-            markersize=10,
-            markeredgecolor="black",
-            markeredgewidth=0.5,
+def plot_band(dir_work, args):
+    """Save bands with an optional total DOS panel from the NSCF calculation."""
+    dir_work = Path(dir_work)
+    band = get_band_data(dir_work / args.band_dir)
+    energy_zero = band["e_vbm"]
+    path_nscf = dir_work / "nscf"
+    has_dos = path_nscf.is_dir()
+    dos = None
+    if has_dos:
+        dos = Vasprun(
+            path_nscf / "vasprun.xml", parse_dos=True, parse_eigen=False,
+            parse_projected_eigen=False, parse_potcar_file=False,
+        ).tdos
+        fig, (ax, ax_dos) = plt.subplots(
+            1, 2, figsize=(6, 4), sharey=True,
+            gridspec_kw={"width_ratios": [3, 1], "wspace": 0.05},
         )
-        for sym in sorted_symbols
-    ]
-
-    return legend_elements
-
-
-def plot_band(dir_work):
+    else:
+        fig, ax = plt.subplots(figsize=(4, 4))
     try:
-        dir_pre = os.path.join(dir_work, "band")
-        dir_tar = os.path.join(dir_work, "band_scf")
-        dir_energy_pre = os.path.join(dir_work, "nscf")
-        dir_energy_tar = os.path.join(dir_work, "scf")
-
-        fig = plt.figure(figsize=(4, 4))
-        gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.5)
-
-        ax1 = fig.add_subplot(gs[0, :])
-        ax2 = fig.add_subplot(gs[1, 0])
-        ax3 = fig.add_subplot(gs[1, 1])
-
-        atoms = read(os.path.join(dir_pre, "POSCAR"))
-        legend_elements = plot_atoms_ase(ax2, atoms)
-        fig.legend(
-            handles=legend_elements,
-            loc="lower center",
-            bbox_to_anchor=(0.3, -0.02),
-            ncol=len(legend_elements),
-            frameon=False,
-            handletextpad=0.2,
-            columnspacing=1.0,
-            handlelength=1.5,
-        )
-
-        band_pre = get_band_data(dir_pre)
-        band_tar = get_band_data(dir_tar)
-
-        e_ref = band_tar["e_vbm"]
-        e_gap_pre = band_pre["e_cbm"] - band_pre["e_vbm"]
-        e_gap_tar = band_tar["e_cbm"] - band_tar["e_vbm"]
-
-        eg_pre = [segment - e_ref for segment in band_pre["energies"]]
-        eg_tar = [segment - e_ref for segment in band_tar["energies"]]
-        # eg_pre = band_pre["energies"]
-        # eg_tar = band_tar["energies"]
-
-        index_lower, index_upper = get_band_index_window(
-            band_tar["e_vbm"], band_tar["bands"], width_lower=4.0
-        )
-        mae_band = np.abs(
-            band_pre["bands"][index_lower:index_upper, :]
-            - band_tar["bands"][index_lower:index_upper, :]
-        ).mean()
-
-        ax1.set_xticks(band_tar["tick_positions"])
-        ax1.set_xticklabels(band_tar["tick_labels"])
-        for xpos in band_tar["tick_positions"]:
-            ax1.axvline(xpos, color="grey", ls="-", lw=0.5)
-
-        for i, (dist, ene) in enumerate(
-            zip(band_pre["distances"], eg_pre, strict=True)
-        ):
-            lines = ax1.plot(
-                dist,
-                ene,
-                c=color_pre,
-                zorder=10,
-                alpha=1.0,
-                linewidth=1,
-                rasterized=True,
-            )
-            if i == 0:
-                lines[0].set_label("EdenGNN")
-
-        for i, (dist, ene) in enumerate(
-            zip(band_tar["distances"], eg_tar, strict=True)
-        ):
-            lines = ax1.plot(
-                dist,
-                ene,
-                c=color_tar,
-                zorder=1,
-                alpha=1.0,
-                linewidth=1.0,
-                rasterized=True,
-                linestyle="dotted",
-            )
-            if i == 0:
-                lines[0].set_label("DFT")
-
-        ymax = max(
-            float(np.max(np.concatenate(eg_pre))),
-            float(np.max(np.concatenate(eg_tar))),
-            4.0,
-        )
-        ax1.axhline(0.0, lw=0.5, ls="-", color="grey")
-        ax1.set_ylabel("Energy (eV)")
-        ax1.set_xlim(0, band_tar["distances"][-1][-1])
-        ax1.set_ylim(-4.0, 4.0)
-        ax1.legend(
-            loc="upper center",
-            bbox_to_anchor=(0.5, -0.12),
-            ncol=3,
-            frameon=False,
-            fontsize=10,
-        )
-
-        plot_parity_band(ax3, np.concatenate(eg_pre), np.concatenate(eg_tar))
-
-        energy_pre = get_energy_per_atom(dir_energy_pre)
-        energy_tar = get_energy_per_atom(dir_energy_tar)
-
-        fig.text(
-            0.3,
-            -0.05,
-            r"$\Delta E$"
-            + f"= {abs(energy_tar - energy_pre) * 1000:.1f} "
-            + r"$\mathrm{meV\cdot atom}^{-1}$",
-            ha="center",
-            va="bottom",
-            fontsize=10,
-        )
-
-        fig.text(
-            0.7,
-            -0.05,
-            r"$\mathrm{MAE_{band}}$" + f" = {mae_band:.3f} eV",
-            ha="center",
-            va="bottom",
-            fontsize=10,
-        )
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(dir_work, "band.png"), dpi=600, bbox_inches="tight")
-        # plt.show()
-        plt.close()
-
-        name = pathlib.Path(dir_work).stem
-        return {name: {"mae_band": mae_band, "mae_gap": abs(e_gap_pre - e_gap_tar)}}
-    except Exception:
-        print(f"error with {dir_work}")
-        return None
+        for distance, energy in zip(band["distances"], band["energies"], strict=True):
+            ax.plot(distance, energy - energy_zero, color="blue", linewidth=1)
+        ax.set_xticks(band["tick_positions"])
+        ax.set_xticklabels(band["tick_labels"])
+        for position in band["tick_positions"]:
+            ax.axvline(position, color="grey", linewidth=0.5)
+        ax.axhline(0, color="grey", linewidth=0.5)
+        ax.set_ylabel("Energy (eV)")
+        ax.set_xlim(0, band["distances"][-1][-1])
+        ax.set_ylim(*args.ylim)
+        if has_dos:
+            ax_dos.plot(dos.get_densities(), dos.energies - energy_zero, color="blue", linewidth=1)
+            ax_dos.axhline(0, color="grey", linewidth=0.5)
+            ax_dos.set_xlabel("DOS (states/eV)")
+            ax_dos.set_xlim(left=0)
+            ax_dos.tick_params(axis="y", left=False)
+            fig.subplots_adjust(left=0.12, right=0.97, bottom=0.18, top=0.97)
+        else:
+            fig.tight_layout()
+        fig.savefig(dir_work / "band.png", dpi=args.dpi)
+    finally:
+        plt.close(fig)
 
 
-nproc = multiprocessing.cpu_count()
-with multiprocessing.Pool(processes=nproc) as pool:
-    results = pool.map(plot_band, dirs)
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--filelist", required=True, type=Path, help="List of calculation directories")
+    parser.add_argument("--band-dir", default="band", help="Band calculation subdirectory (default: band)")
+    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Energy limits in eV (default: -4 4)")
+    parser.add_argument("--dpi", type=int, default=300, help="Image resolution (default: 300)")
+    parser.add_argument("--nproc", type=int, default=1, help="Parallel plotting processes (default: 1)")
+    args = parser.parse_args()
+    with args.filelist.open() as f:
+        paths = [line.strip() for line in f if line.strip()]
+    if args.nproc == 1:
+        for path in paths:
+            plot_band(path, args)
+    else:
+        with multiprocessing.Pool(min(multiprocessing.cpu_count(), args.nproc)) as pool:
+            pool.starmap(plot_band, [(path, args) for path in paths])
 
-mae_list = [res for res in results if res is not None]
 
-with open(path_save, "w") as f:
-    json.dump(mae_list, f, indent=4)
+if __name__ == "__main__":
+    main()

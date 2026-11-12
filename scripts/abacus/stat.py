@@ -1,3 +1,27 @@
+r"""
+Compare predicted and reference ABACUS bands and save band MAE statistics.
+
+Usage:
+    python scripts/abacus/stat.py \
+        --filelist /path/to/predicted_calculations.txt \
+        --dir-tar /path/to/reference_calculations \
+        --mae-output /path/to/stat.json \
+        --prefix EDENGNN --prefix-tar aiida
+
+Inputs:
+    --filelist   Required list of predicted calculation directories, one per line.
+    --dir-tar    Required reference root; references use each predicted directory's name.
+    --mae-output Required output JSON path.
+    --prefix     Predicted OUT.<suffix> suffix (default: EDENGNN).
+    --prefix-tar Reference OUT.<suffix> suffix (default: aiida).
+    --use-shift / --no-use-shift
+                 Align predicted and reference mean band energies (default: enabled).
+
+Each calculation needs KPT and OUT.<suffix>/{BANDS_1.dat,running_nscf.log,STRU.cif}.
+Saves band.png in each predicted calculation directory and summary MAE in eV.
+"""
+
+import argparse
 import json
 import os
 import pathlib
@@ -41,12 +65,7 @@ def parse_kpt(kpt_path):
 
 
 def parse_band(dir, prefix, ax, color="b", line=True, shift_to_mean_ev=None):
-    name = pathlib.Path(dir).stem
-    try:
-        data = np.loadtxt(os.path.join(dir, f"OUT.{prefix}", "BANDS_1.dat"))
-    except:
-        print(f"error with {name}")
-        return None, None
+    data = np.loadtxt(os.path.join(dir, f"OUT.{prefix}", "BANDS_1.dat"))
     bands = data[:, 2:]
 
     ef = get_fermi_energy(os.path.join(dir, f"OUT.{prefix}", "running_nscf.log"))
@@ -151,70 +170,81 @@ def parse_band(dir, prefix, ax, color="b", line=True, shift_to_mean_ev=None):
     return bands, ef
 
 
-path_dir = "/public/home/lixiwen/dataset/mxene/dataset_test.txt"
-MAE_OUTPUT_PATH = "/public/home/lixiwen/dataset/mxene/edengnn/2026-06-29-10-29-23/stat.json"
-dir_tar = (
-    "/public/home/lixiwen/dataset/mxene/scf"
-)
-USE_SHIFT = True
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--filelist", required=True, type=pathlib.Path, help="List of predicted calculation directories")
+    parser.add_argument("--dir-tar", required=True, type=pathlib.Path, help="Reference calculation root")
+    parser.add_argument("--mae-output", required=True, type=pathlib.Path, help="Output JSON path")
+    parser.add_argument("--prefix", default="EDENGNN", help="Prediction suffix (default: EDENGNN)")
+    parser.add_argument("--prefix-tar", default="aiida", help="Reference suffix (default: aiida)")
+    parser.add_argument(
+        "--use-shift", action=argparse.BooleanOptionalAction, default=True,
+        help="Align mean band energies (default: enabled)",
+    )
+    args = parser.parse_args()
 
-with open(path_dir, "r") as f:
-    paths = [line.strip() for line in f]
+    with args.filelist.open() as f:
+        paths = [line.strip() for line in f if line.strip()]
 
-structure_metrics = []
-for structure_index, path in enumerate(paths):
-    try:
-        fig, ax = plt.subplots(figsize=(4, 4))
-        plt.title("Electronic Band Structure", fontsize=16)
-        plt.tight_layout()
-        print(path)
-        name = pathlib.Path(path).stem
-        bands_tar, ef_tar = parse_band(
-            os.path.join(dir_tar, name), "aiida", ax, color="r", line=False
-        )
-        shift_to_mean_ev = np.mean(bands_tar) if USE_SHIFT else None
-        bands_pre, ef_pre = parse_band(
-            path,
-            "aiida",
-            ax,
-            color="b",
-            shift_to_mean_ev=shift_to_mean_ev,
-        )
+    structure_metrics = []
+    for structure_index, path in enumerate(paths):
+        try:
+            fig, ax = plt.subplots(figsize=(4, 4))
+            plt.title("Electronic Band Structure", fontsize=16)
+            plt.tight_layout()
+            print(path)
+            name = pathlib.Path(path).stem
+            bands_tar, ef_tar = parse_band(
+                os.path.join(args.dir_tar, name), args.prefix_tar, ax, color="r", line=False
+            )
+            shift_to_mean_ev = np.mean(bands_tar) if args.use_shift else None
+            bands_pre, ef_pre = parse_band(
+                path,
+                args.prefix,
+                ax,
+                color="b",
+                shift_to_mean_ev=shift_to_mean_ev,
+            )
 
-        band_mae_ev = np.mean(np.abs(bands_pre - bands_tar))
-        print(f"Structure {structure_index}: band MAE = {band_mae_ev:.6f} eV")
-        structure_metrics.append(
-            {
-                "structure_index": structure_index,
-                "path": path,
-                "band_mae_ev": float(band_mae_ev),
-            }
-        )
-        ax.set_ylim(-4 + ef_tar, 4 + ef_tar)
+            band_mae_ev = np.mean(np.abs(bands_pre - bands_tar))
+            print(f"Structure {structure_index}: band MAE = {band_mae_ev:.6f} eV")
+            structure_metrics.append(
+                {
+                    "structure_index": structure_index,
+                    "path": path,
+                    "band_mae_ev": float(band_mae_ev),
+                }
+            )
+            ax.set_ylim(-4 + ef_tar, 4 + ef_tar)
 
-        plt.show()
-        plt.savefig(os.path.join(path, "band.png"), dpi=300)
-        plt.close()
-    except Exception as error:
-        plt.close()
-        print(f"Error processing {path}: {error}")
+            plt.savefig(os.path.join(path, "band.png"), dpi=300)
+            plt.close()
+        except Exception as error:
+            plt.close()
+            print(f"Error processing {path}: {error}")
 
-if not structure_metrics:
-    raise ValueError("No structures were processed; band MAE cannot be calculated.")
+    if not structure_metrics:
+        raise ValueError("No structures were processed; band MAE cannot be calculated.")
 
-mean_band_mae_ev = float(
-    np.mean([metrics["band_mae_ev"] for metrics in structure_metrics])
-)
-mae_output = {
-    "unit": "eV",
-    "use_shift": USE_SHIFT,
-    "mean_band_mae_ev": mean_band_mae_ev,
-    "num_structures": len(structure_metrics),
-    "structures": structure_metrics,
-}
-with MAE_OUTPUT_PATH.open("w") as output_file:
-    json.dump(mae_output, output_file, indent=2)
+    mean_band_mae_ev = float(
+        np.mean([metrics["band_mae_ev"] for metrics in structure_metrics])
+    )
+    mae_output = {
+        "unit": "eV",
+        "use_shift": args.use_shift,
+        "mean_band_mae_ev": mean_band_mae_ev,
+        "num_structures": len(structure_metrics),
+        "structures": structure_metrics,
+    }
+    with args.mae_output.open("w") as output_file:
+        json.dump(mae_output, output_file, indent=2)
 
-shift_label = "shifted" if USE_SHIFT else "unshifted"
-print(f"Mean {shift_label} band MAE = {mean_band_mae_ev:.6f} eV")
-print(f"Band MAE metrics saved to {MAE_OUTPUT_PATH}")
+    shift_label = "shifted" if args.use_shift else "unshifted"
+    print(f"Mean {shift_label} band MAE = {mean_band_mae_ev:.6f} eV")
+    print(f"Band MAE metrics saved to {args.mae_output}")
+
+
+if __name__ == "__main__":
+    main()

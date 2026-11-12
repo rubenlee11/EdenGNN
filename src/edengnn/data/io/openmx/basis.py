@@ -1,5 +1,3 @@
-DIR_PP = "/public/home/lixiwen/software/openmx3.9/DFT_DATA19"
-
 spin_set = {
     "H": [0.5, 0.5],  # 1
     "He": [1.0, 1.0],  # 2
