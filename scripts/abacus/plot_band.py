@@ -9,19 +9,25 @@ Inputs:
     --filelist Required list of structure calculation directories, one per line.
     --band-dir Band calculation subdirectory (default: band).
     --prefix   OUT.<suffix> suffix for band and NSCF outputs (default: EDENGNN).
-    --ylim     Energy limits relative to the band Fermi energy, in eV (default: -4 4).
+    --plot-pdos Also overlay PDOS (default: disabled).
+    --ylim     Offsets below VBM and above CBM, in eV (default: -4 4).
+    --gap-break Split gaps larger than this value in eV (default: 2).
     --dpi      Image resolution (default: 300).
     --nproc    Parallel plotting processes (default: 1).
 
 Reads band/STRU, band/KPT (Line mode), and
 band/OUT.<suffix>/{BANDS_1.dat,running_nscf.log}.
-If nscf/ exists, reads nscf/OUT.<suffix>/TDOS.dat (LCAO out_dos=2) and draws
-the total DOS beside the bands. Spin channels in TDOS.dat are summed.
-Both panels use the band calculation's Fermi energy as zero.
+If nscf/ exists, reads nscf/OUT.<suffix>/TDOS (LCAO out_dos=2) and draws
+the total DOS beside the bands. Spin channels in TDOS are summed.
+With --plot-pdos, read nscf/OUT.<suffix>/PDOS and overlay projections by element
+and angular momentum (s/p/d/f), including all atoms and spin channels.
+Both panels use VBM (Ef for metals) as zero; gaps above 2 eV are broken.
 Saves band.png in each listed directory. Use stat.py for target comparisons.
 """
 
 import argparse
+import sys
+import xml.etree.ElementTree as ET
 import multiprocessing
 import os
 import pathlib
@@ -30,6 +36,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from ase.io import read
+
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from plot_band_utils import plot_band_dos
 
 
 def get_fermi_energy(log_path):
@@ -65,12 +75,12 @@ def parse_kpt(kpt_path):
     return kpt_data
 
 
-def parse_band(dir, prefix, ax, color="b"):
+def get_band_data(dir, prefix):
+    """Read path segments and find band edges; crossing bands use Ef."""
     data = np.loadtxt(os.path.join(dir, f"OUT.{prefix}", "BANDS_1.dat"))
     bands = data[:, 2:]
 
     ef = get_fermi_energy(os.path.join(dir, f"OUT.{prefix}", "running_nscf.log"))
-    bands -= ef
 
     atoms = read(os.path.join(dir, "STRU"), format="abacus")
     recip_cell = atoms.cell.reciprocal() * 2 * np.pi
@@ -142,56 +152,75 @@ def parse_band(dir, prefix, ax, color="b"):
     x_path = x_path[:min_len]
     bands = bands[:min_len]
 
-    # 6. Plotting
-    num_bands = bands.shape[1]
+    band_min = bands.min(axis=0)
+    band_max = bands.max(axis=0)
+    is_metal = np.any((band_min < ef - 1e-3) & (band_max > ef + 1e-3))
+    if is_metal:
+        e_vbm = e_cbm = ef
+    else:
+        e_vbm = band_max[band_max <= ef + 1e-3].max()
+        e_cbm = band_min[band_min > ef + 1e-3].min()
+    return {
+        "distances": [x_path[start:min(end, min_len)] for start, end in continuous_segments if start < min_len],
+        "energies": [bands[start:min(end, min_len)] for start, end in continuous_segments if start < min_len],
+        "tick_positions": x_ticks, "tick_labels": x_labels,
+        "e_vbm": e_vbm, "e_cbm": e_cbm, "efermi": ef,
+    }
 
-    for start, end in continuous_segments:
-        if start >= min_len:
-            break
-        end = min(end, min_len)
 
-        for b in range(num_bands):
-            ax.plot(x_path[start:end], bands[start:end, b], color=color, linewidth=1.5)
+def parse_band(dir, prefix, ax, color="b"):
+    """Plot bands relative to Ef on an existing axis; return bands and Ef."""
+    band = get_band_data(dir, prefix)
+    for distance, energy in zip(band["distances"], band["energies"], strict=True):
+        ax.plot(distance, energy - band["efermi"], color=color, linewidth=1.5)
+    ax.set_xticks(band["tick_positions"], band["tick_labels"])
+    ax.set_ylabel(r"$E - E_f$ (eV)")
+    return np.concatenate(band["energies"]) - band["efermi"], band["efermi"]
 
-    ax.set_ylabel(r"$E - E_f$ (eV)", fontsize=14)
-    ax.set_xlim(x_path[0], x_path[-1])
-    ax.set_ylim(-4, 4)
 
-    for xt in x_ticks:
-        ax.axvline(x=xt, color="black", linewidth=0.8, linestyle="--")
-
-    ax.set_xticks(x_ticks)
-    ax.set_xticklabels(x_labels, fontsize=14)
-    ax.axhline(y=0, color="gray", linewidth=1.0, linestyle=":")
-
-    return bands, ef
+def read_pdos(path):
+    """Read ABACUS XML PDOS, summing atoms, radial functions and spins by species/l."""
+    root = ET.parse(path).getroot()
+    energy_ev = np.fromstring(root.findtext("energy_values"), sep=" ")
+    n_spin = int(root.findtext("nspin"))
+    projections = {}
+    for orbital in root.findall("orbital"):
+        element = orbital.attrib["species"].strip()
+        angular_momentum = int(orbital.attrib["l"])
+        label = f"{element}-{('spdfgh'[angular_momentum])}"
+        density = np.fromstring(orbital.findtext("data"), sep=" ")
+        density = density.reshape(len(energy_ev), n_spin).sum(axis=1)
+        if label in projections:
+            projections[label] += density
+        else:
+            projections[label] = density
+    return energy_ev, projections
 
 
 def plot_band(dir_work, args):
-    """Save bands and optional total DOS with a shared Fermi-energy reference."""
+    """Save a band/DOS plot spanning VBM-4 eV to CBM+4 eV by default."""
     dir_work = pathlib.Path(dir_work)
+    band = get_band_data(dir_work / args.band_dir, args.prefix)
+    energy_zero = band["e_vbm"]
+    dos_energy_ev = dos_density = None
+    pdos_energy_ev = None
+    projections = None
     path_nscf = dir_work / "nscf"
-    has_dos = path_nscf.is_dir()
-    if has_dos:
-        dos = np.loadtxt(path_nscf / f"OUT.{args.prefix}" / "TDOS.dat")
-        fig, (ax, ax_dos) = plt.subplots(
-            1, 2, figsize=(6, 4), sharey=True,
-            gridspec_kw={"width_ratios": [3, 1], "wspace": 0.05},
-        )
-    else:
-        fig, ax = plt.subplots(figsize=(4, 4))
+    if path_nscf.is_dir():
+        dir_output = path_nscf / f"OUT.{args.prefix}"
+        dos = np.loadtxt(dir_output / "TDOS")
+        dos_energy_ev = dos[:, 0] - energy_zero
+        dos_density = dos[:, 1:].sum(axis=1)
+        if args.plot_pdos:
+            pdos_energy_ev, projections = read_pdos(dir_output / "PDOS")
+            pdos_energy_ev -= energy_zero
+    fig = plot_band_dos(
+        band["distances"], [energy - energy_zero for energy in band["energies"]],
+        band["tick_positions"], band["tick_labels"], band["e_cbm"] - energy_zero,
+        dos_energy_ev, dos_density, args.ylim, args.gap_break,
+        pdos_energy_ev=pdos_energy_ev, projections=projections,
+    )
     try:
-        _, ef = parse_band(dir_work / args.band_dir, args.prefix, ax, color="b")
-        ax.set_ylim(*args.ylim)
-        if has_dos:
-            ax_dos.plot(dos[:, 1:].sum(axis=1), dos[:, 0] - ef, color="b", linewidth=1)
-            ax_dos.axhline(0, color="gray", linewidth=0.5)
-            ax_dos.set_xlabel("DOS (states/eV)")
-            ax_dos.set_xlim(left=0)
-            ax_dos.tick_params(axis="y", left=False)
-            fig.subplots_adjust(left=0.14, right=0.97, bottom=0.18, top=0.97)
-        else:
-            fig.tight_layout()
         fig.savefig(dir_work / "band.png", dpi=args.dpi)
     finally:
         plt.close(fig)
@@ -204,7 +233,9 @@ def main():
     parser.add_argument("--filelist", required=True, type=pathlib.Path, help="List of structure calculation directories")
     parser.add_argument("--band-dir", default="band", help="Band calculation subdirectory (default: band)")
     parser.add_argument("--prefix", default="EDENGNN", help="Calculation suffix (default: EDENGNN)")
-    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Energy limits in eV relative to Ef (default: -4 4)")
+    parser.add_argument("--plot-pdos", action="store_true", help="Overlay element/orbital PDOS (default: disabled)")
+    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Offsets below VBM and above CBM in eV (default: -4 4)")
+    parser.add_argument("--gap-break", type=float, default=2, help="Split gaps larger than this value in eV (default: 2)")
     parser.add_argument("--dpi", type=int, default=300, help="Image resolution (default: 300)")
     parser.add_argument("--nproc", type=int, default=1, help="Parallel plotting processes (default: 1)")
     args = parser.parse_args()

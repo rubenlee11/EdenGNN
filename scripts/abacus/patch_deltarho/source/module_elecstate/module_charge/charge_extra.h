@@ -2,10 +2,10 @@
 #define CHARGE_EXTRA_H
 
 #include "charge.h"
-#include "source_cell/unitcell.h"
-#include "source_pw/module_pwdft/structure_factor.h"
+#include "module_cell/unitcell.h"
+#include "module_hamilt_pw/hamilt_pwdft/structure_factor.h"
 #ifdef __MPI
-#include "source_pw/module_pwdft/parallel_grid.h"
+#include "module_hamilt_pw/hamilt_pwdft/parallel_grid.h"
 #endif
 
 /**
@@ -98,6 +98,7 @@ class Charge_Extra
      * @param inp input parameters
     */
     void write_delta_rho(const UnitCell& ucell, const Charge* chr, const Parallel_Grid &para_grid);
+
 
   private:
     int istep = 0; ///< the current step

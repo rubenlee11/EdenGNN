@@ -1,4 +1,4 @@
-r"""Compare VASP NSCF/SCF results and save statistics and parity plots.
+r"""Compare VASP NSCF/SCF results and save statistics and band comparisons.
 
 Usage (activate the eqgnn environment first):
     python scripts/vasp/stat.py \
@@ -12,222 +12,28 @@ Usage (activate the eqgnn environment first):
 Inputs:
     --filelist Required list of structure calculation directories, one per line.
                Each contains nscf/ and, by default, scf/.
-    --save-dir Required directory for stat_mae.json and aggregate parity PDFs.
-    --dir-tar  Optional reference root; read <root>/<structure name>/scf/.
+    --save-dir Required directory for stat_mae.json.
+    --dir-tar  Optional reference root; read <root>/<structure name>/{scf,band_scf}/.
                Without this option, read scf/ alongside each nscf/ directory.
     --nproc    Parallel analysis processes (default: 1).
 
 SCF and NSCF directories need vasprun.xml, KPOINTS and CHGCAR.
 Retains band-energy, density, augmentation, energy-per-atom, band-gap and force
-statistics. Per-structure comparison images are saved in the listed directories.
+statistics. band/ and band_scf/ provide high-symmetry comparison bands.
+Per-structure comparison images are saved in the listed directories.
 """
 
 import os, pathlib, json, argparse, multiprocessing, re
 import numpy as np
 from pymatgen.io.vasp.outputs import Vasprun
-from pymatgen.io.vasp import Chgcar
+from edengnn.data.io.vasp.parse_density import _read_chgcar
 from pymatgen.electronic_structure.core import Spin
 import matplotlib
 from matplotlib.lines import Line2D
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-
-# colors = plt.cm.tab10.colors
-colors = ["#6ca4a7", "#f0dfa7", "#7d7a7a", "#c199a2", "#995d6b"]
-color_baseline = "darkolivegreen"
-color_parity = "darkblue"
-
-sample_density = 1000
-xlabel_dict = {
-    "band_energy": r"$\varepsilon_{nk}$ (eV)",
-    "density": r"$\tilde{n}(\mathbf{r})$ $\mathrm{(e\ \AA^{-3})}$",
-    "aug": r"$\rho^a_{NLM}$",
-    # "energy_per_atom": r"$E$ (eV per atom)",
-    "energy_per_atom": r"$E$ $(\mathrm{eV\cdot atom}^{-1})$",
-    "band_gap": r"$E_g$ (eV)",
-    "forces": r"$F$ $(eV\ \AA^{-1})$",
-}
-ylabel_dict = {
-    "band_energy": r"$\hat{\varepsilon}_{nk}$ (eV)",
-    "density": r"$\hat{\tilde{n}}(\mathbf{r})$ $\mathrm{(e\ \AA^{-3})}$",
-    "aug": r"$\hat{\rho}^a_{NLM}$",
-    # "energy_per_atom": r"$\hat{E}$ (eV per atom)",
-    "energy_per_atom": r"$\hat{E}$ $(\mathrm{eV\cdot atom}^{-1})$",
-    "band_gap": r"$\hat{E}_g$ (eV)",
-    "forces": r"$\hat{F}$ $(eV\ \AA^{-1})$",
-}
-range_error_dict = {
-    "band_energy": [-0.2, 0.2],
-    "density": [-0.001, 0.001],
-    "aug": [-0.001, 0.001],
-    "energy_per_atom": [-0.1, 0.1],
-    "band_gap": [-0.1, 0.1],
-    "forces": [-0.1, 0.1],
-}
-mae_unit_dict = {
-    "band_energy": r"$\mathrm{MAE}$",
-    "density": r"$\varepsilon_{\tilde{n}}$",
-    "aug": r"$\mathrm{MAE}$",
-    "energy_per_atom": r"$\mathrm{MAE}$",
-    "band_gap": r"$\mathrm{MAE}$",
-    "forces": r"$\mathrm{MAE}$",
-}
-name_to_mae_dict = {
-    "band_energy": "mae_band_energies",
-    "density": "mae_density",
-    "aug": "mae_aug",
-    "energy_per_atom": "mae_energy_per_atom",
-    "band_gap": "mae_band_gap",
-    "forces": "mae_forces",
-}
-
-
-def plot_parity(pre, tar, save_path, mae=None, label=None):
-    r2 = 1.0 - np.sum((pre - tar) ** 2) / np.sum((pre - tar.mean()) ** 2)
-    err = pre - tar
-
-    fig, ax = plt.subplots(figsize=(3, 3))
-    ax.plot(
-        [tar.min(), tar.max()],
-        [tar.min(), tar.max()],
-        color=color_baseline,
-        linestyle="--",
-        zorder=10,
-    )
-    ax.scatter(
-        tar,
-        pre,
-        s=12,
-        color=color_parity,
-        zorder=2,
-        alpha=0.4,
-        edgecolors="none",
-        rasterized=True,
-    )
-
-    # set label
-    if label is not None:
-        ax.set_xlabel(xlabel_dict[label])
-        ax.set_ylabel(ylabel_dict[label])
-        # axins.set_xlim(range_error_dict[label][0], range_error_dict[label][1])
-    else:
-        ax.set_xlabel("True")
-        ax.set_ylabel("Pred")
-
-    if mae is not None:
-        mae_text = mae_unit_dict[label]
-        if label == "band_energy":
-            mae_text += f" = {mae:.3f} eV"
-        elif label == "density":
-            mae_text += f" = {mae * 100:.2f} %"
-        elif label == "aug":
-            mae_text += f" = {mae:.4f}"
-        elif label == "energy_per_atom":
-            if mae > 0.001:
-                mae_text += f" = {mae:.3f} " + r"$\mathrm{eV\cdot atom}^{-1}$"
-            else:
-                mae_text += f" < 1 " + r"$\mathrm{meV\cdot atom}^{-1}$"
-        elif label == "band_gap":
-            mae_text += f" = {mae:.3f} eV"
-        elif label == "forces":
-            mae_text += f" = {mae:.3f} " + r"$(eV\ \AA^{-1})$"
-    else:
-        mae_text = ""
-
-    if r2 > 0.99999:
-        r2_text = rf"$R^2 > 0.99999$"
-    else:
-        r2_text = rf"$R^2 = {r2:.5f}$"
-
-    ax.text(
-        0.05,
-        0.95,
-        r2_text + "\n" + mae_text,
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-    )
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.close()
-    return r2
-
-
-def plot_band_energy(energy_pre, energy_tar, e0, save_path):
-    nb, nk = energy_pre.shape
-
-    xk = np.linspace(0, 1, nk)
-
-    plt.figure(figsize=(6, 3))
-    for ik in range(nk):
-        plt.plot(
-            np.full(nb, xk[ik]),
-            energy_pre[:, ik],
-            marker="*",
-            ms=4,
-            linestyle="None",
-            color="r",
-            alpha=0.3,
-        )
-    for ik in range(nk):
-        plt.plot(
-            np.full(nb, xk[ik]),
-            energy_tar[:, ik],
-            marker="o",
-            ms=2,
-            linestyle="None",
-            color="b",
-            alpha=0.3,
-        )
-
-    plt.axhline(0.0, ls="--")
-    plt.ylim(-5 + e0, 5 + e0)
-    plt.xticks([])
-    plt.ylabel("Energy (eV)")
-
-    legend_elements = [
-        Line2D([0], [0], color="blue", lw=2, label="VASP"),
-        Line2D([0], [0], color="red", lw=2, label="E3SR"),
-    ]
-
-    plt.legend(handles=legend_elements)
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.close()
-
-
-def fermi_window_indices(Ek, n=4):
-    """
-    find the closest neighbor eigenstates for vbm or fermi surface
-    """
-    idx = np.searchsorted(Ek, 0.0)
-
-    lo = max(0, idx - n)
-    hi = min(len(Ek), idx + n)
-
-    return lo, hi
-
-
-def fermi_window_mae(Epre, Etar, n=4):
-    """
-    Epre, Etar: (nb, nk)
-    """
-    nb, nk = Epre.shape
-    err = []
-
-    for ik in range(nk):
-        ep = Epre[:, ik]
-        et = Etar[:, ik]
-
-        lo_p, hi_p = fermi_window_indices(ep, n)
-        lo_t, hi_t = fermi_window_indices(et, n)
-
-        m = min(hi_p - lo_p, hi_t - lo_t)
-
-        err.append(np.abs(ep[lo_p : lo_p + m] - et[lo_t : lo_t + m]))
-
-    return np.mean(np.concatenate(err))
-
+from plot_band import get_band_data, plot_band_dos
 
 def aug2irreps(aug, aug_l, lmix_max):
     aug_irreps = []
@@ -259,13 +65,8 @@ def aug2irreps(aug, aug_l, lmix_max):
 
 
 def parse_chgcar(path, lmix_max=2):
-    chgcar = Chgcar.from_file(path)
-    structure = chgcar.structure
-    density = chgcar.data["total"] / structure.lattice.volume
-    z = [site.specie.number for site in structure]
-
-    # parse aug. pymatgen has bug reading aug, I need to modify a little bit
-    lines = chgcar.data_aug["total"]
+    """Read density in electrons/Å³ and flattened PAW augmentation occupancies."""
+    _, _, _, _, density, lines = _read_chgcar(os.fspath(path))
 
     aug_num = []
     aug_list_str = []
@@ -340,6 +141,27 @@ def stat_vasprun(work_path, band=False):
         return None
 
 
+def plot_band_comparison(predicted_dir, target_dir, save_path):
+    """Overlay high-symmetry bands using the target VBM/Ef as energy zero."""
+    predicted = get_band_data(predicted_dir)
+    target = get_band_data(target_dir)
+    energy_zero = target["e_vbm"]
+    fig = plot_band_dos(
+        target["distances"], [energy - energy_zero for energy in target["energies"]],
+        target["tick_positions"], target["tick_labels"], target["e_cbm"] - energy_zero,
+    )
+    try:
+        for ax in fig.axes:
+            for distance, energy in zip(predicted["distances"], predicted["energies"]):
+                ax.plot(distance, energy - energy_zero, color="red", linewidth=0.9,
+                        linestyle="--")
+        fig.axes[0].legend(handles=[Line2D([], [], color="#245c91", label="SCF target"),
+                                   Line2D([], [], color="red", linestyle="--", label="Prediction")])
+        fig.savefig(save_path, dpi=300)
+    finally:
+        plt.close(fig)
+
+
 def stat_structure(dir_work, args):
     name = pathlib.Path(dir_work).stem
     try:
@@ -352,29 +174,11 @@ def stat_structure(dir_work, args):
         data_nscf, bs = stat_vasprun(path_nscf, band=False)
         data_scf, bs = stat_vasprun(path_scf, band=False)
 
+        reference_root = pathlib.Path(args.dir_tar) / name if args.dir_tar else pathlib.Path(dir_work)
+        plot_band_comparison(pathlib.Path(dir_work) / "band", reference_root / "band_scf",
+                             pathlib.Path(dir_work) / "band_compare.png")
         stat_mae = {"name": name}
 
-        # plot band
-        plot_band_energy(
-            data_nscf["band_energies"],
-            data_scf["band_energies"],
-            data_scf["e0"],
-            os.path.join(dir_work, "band_energy_error.png"),
-        )
-        band_energy_pre = np.array(data_nscf["band_energies"]).flatten()
-        band_energy_tar = np.array(data_scf["band_energies"]).flatten()
-        r2_band = plot_parity(
-            band_energy_pre,
-            band_energy_tar,
-            os.path.join(dir_work, "band_energy_parity.png"),
-            label="band_energy",
-        )
-
-        stat_mae["eigenenergy_2"] = fermi_window_mae(
-            data_nscf["band_energies"], data_scf["band_energies"], n=2
-        )
-
-        # plot density
         chg_nscf, aug_nscf = parse_chgcar(
             os.path.join(path_nscf, "CHGCAR")
         )
@@ -383,15 +187,13 @@ def stat_structure(dir_work, args):
         )
         den_pre = chg_nscf.flatten()
         den_tar = chg_scf.flatten()
-        ngrid = len(den_tar)
-        i_samp = np.random.choice(ngrid, sample_density, replace=False)
 
         stat_mae["mae_density"] = np.sum(np.abs(den_pre - den_tar)) / np.sum(den_tar)
         stat_mae["mae_aug"] = np.abs(aug_nscf - aug_scf).mean()
-        r2_aug = plot_parity(
-            aug_nscf, aug_scf, os.path.join(dir_work, "aug_error.png"), label="aug"
+        stat_mae["r2_aug"] = float(
+            1.0 - np.sum((aug_nscf - aug_scf) ** 2)
+            / np.sum((aug_nscf - aug_scf.mean()) ** 2)
         )
-        stat_mae["r2_aug"] = r2_aug
         # energy, forces, band energies, band gaps
         stat_mae["mae_" + "band_energies"] = np.abs(
             data_nscf["band_energies"] - data_scf["band_energies"]
@@ -402,29 +204,13 @@ def stat_structure(dir_work, args):
         stat_mae["mae_" + "band_gap"] = np.abs(
             data_nscf["band_gap"] - data_scf["band_gap"]
         ).mean()
+        stat_mae["gap_predict_ev"] = float(data_nscf["band_gap"])
+        stat_mae["gap_target_ev"] = float(data_scf["band_gap"])
         stat_mae["mae_" + "forces"] = np.abs(
             data_nscf["forces"] - data_scf["forces"]
         ).mean()
 
-        return {
-            "mae": stat_mae,
-            "pre": {
-                "band_energy": band_energy_pre.tolist(),
-                "density": den_pre[i_samp].tolist(),
-                "aug": aug_nscf.tolist(),
-                "energy_per_atom": [data_nscf["energy_per_atom"]],
-                "band_gap": [data_nscf["band_gap"]],
-                "forces": data_nscf["forces"].flatten().tolist(),
-            },
-            "tar": {
-                "band_energy": band_energy_tar.tolist(),
-                "density": den_tar[i_samp].tolist(),
-                "aug": aug_scf.tolist(),
-                "energy_per_atom": [data_scf["energy_per_atom"]],
-                "band_gap": [data_scf["band_gap"]],
-                "forces": data_scf["forces"].flatten().tolist(),
-            },
-        }
+        return stat_mae
 
     except Exception as e:
         print("Caught exception:", e)
@@ -444,23 +230,6 @@ def main():
     with args.filelist.open() as f:
         dirs_work = [line.strip() for line in f if line.strip()]
 
-    pre_dict = {
-        "band_energy": [],
-        "density": [],
-        "aug": [],
-        "energy_per_atom": [],
-        "band_gap": [],
-        "forces": [],
-    }
-    tar_dict = {
-        "band_energy": [],
-        "density": [],
-        "aug": [],
-        "energy_per_atom": [],
-        "band_gap": [],
-        "forces": [],
-    }
-
     if args.nproc == 1:
         results = [stat_structure(path, args) for path in dirs_work]
     else:
@@ -468,15 +237,7 @@ def main():
         with multiprocessing.Pool(processes=nproc) as pool:
             results = pool.starmap(stat_structure, [(path, args) for path in dirs_work])
 
-    maes = []
-    for result in results:
-        if result is not None:
-            maes.append(result["mae"])
-            for key, value in result["pre"].items():
-                pre_dict[key].extend(value)
-
-            for key, value in result["tar"].items():
-                tar_dict[key].extend(value)
+    maes = [result for result in results if result is not None]
 
     if not maes:
         raise ValueError("No structures were processed; statistics cannot be calculated.")
@@ -484,18 +245,6 @@ def main():
     with open(os.path.join(args.save_dir, "stat_mae.json"), "w") as f:
         json.dump(maes, f, indent=2)
 
-    # calculate mae and plot parity plot
-
-    for key in pre_dict.keys():
-        values = [d[name_to_mae_dict[key]] for d in maes]
-
-        plot_parity(
-            np.array(pre_dict[key]),
-            np.array(tar_dict[key]),
-            os.path.join(args.save_dir, f"parity_{key}.pdf"),
-            mae=sum(values) / len(values),
-            label=key,
-        )
 
 
 if __name__ == "__main__":

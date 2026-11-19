@@ -18,13 +18,13 @@ run:
   seed: 42          
 
   # [default] Hardware device for computation. Options: "cpu", "cuda:0", etc.
-  device: cuda:0       
+  device: cuda:0
 
   # [default] Number of GPUs to use for data distributed training. Experimental usage.
   num_gpus: 1      
 
   # [check] "train" or "predict"        
-  mode: predict       
+  mode: predict
 
   # [check] Task type. 0: density; 1: augmentation; 2: density & augmentation; Must match ckpt if any.
   task: 0
@@ -56,11 +56,11 @@ data:
 
   openmx:
     # [set]:
-    path_template: absolute/path/to/EdenGNN-main/scripts/openmx/template.dat 
+    path_template: /path/to/openmx/template.dat 
 
     # [default]: Cutoff energy in [Hartree] for specifying the real space grid 
     # density. See the scf.energycutoff tag in OpenMX.
-    encut: 220 
+    encut: 220
 
     # [check predict]: number of cpus used for restart OpenMX calculations
     num_proc: 4  
@@ -69,8 +69,8 @@ data:
     # [check] Should be consistent with the LMAXMIX tag of your VASP calculations
     lmix_max: 6 
 
-    # [check] Element -> {path_pp: POTCAR path}; also determines the PAW projector basis.
-    path_pp: /root/research/ml_charge_density/EdenGNN-main/scripts/vasp/pp.json
+    # [check] Element -> {path_pp: POTCAR path}, determines the PAW projector basis.
+    path_pp: /path/to/vasp/pp.json
 
     # [check train] Directory of scf calculations which contain sub directories 
     # the name of which are consistent in data.path_train and data.path_val
@@ -81,10 +81,10 @@ data:
     prefix: PBE
 
     # [check] Pseudopotential and basis set. Should be consistent in the training and predicting stages.
-    path_pp: /root/research/ml_charge_density/EdenGNN-main/scripts/abacus/pp.json
+    path_pp: /path/to/abacus/pp.json
 
     # [check predict] Template must specify ecutwfc (Ry) for the prediction grid.
-    path_input: /root/research/ml_charge_density/EdenGNN-main/scripts/abacus/INPUT
+    path_input: /path/to/abacus/INPUT
   
   siesta:
     # [check train] SIESTA 'SystemLabel' keywords. used for reading the training directories
@@ -193,16 +193,16 @@ model:
 
   # [check predict] Whether or not predict total charge density. Set True for 
   # predict VASP CHGCAR. Otherwise set it False.
-  use_sad: False 
+  use_sad: False
 
   # [check train] Maximum number of probe points per training chunk. Should be
   # set close to the OOM value to improve speed.
   # (depends on your GPU, 20,000,000 works for A800 GPU which has 80G VRAM).
-  chunk_size_train: 1000000
+  chunk_size_train: 2000000
 
   # [check] Maximum number of probe points per prediction chunk.
   # (depends on your GPU, 20,000,000 works for A800 GPU which has 80G VRAM).
-  chunk_size_predict: 1000000
+  chunk_size_predict: 2000000
 
   atom:
     # [default]
@@ -239,7 +239,7 @@ model:
     edge:
       # [default]: The radius in [Angstrom] which determines the neighbor grids 
       # for atoms.
-      cutoff: 4.0 
+      cutoff: 4.0
 
       # [default]
       n_radial_basis: 8 

@@ -73,3 +73,14 @@ py.extension_module('utils_f',
 )
 
 install_subdir('src/edengnn', install_dir: py.get_install_dir())
+
+# meson-python builds wheels without running Meson's install scripts.
+custom_target('user_data',
+  input: 'scripts/install_user_data.py',
+  output: 'user_data.stamp',
+  command: [py, '@INPUT@', meson.project_source_root(), '--stamp', '@OUTPUT@'],
+  build_by_default: true,
+  build_always_stale: true,
+)
+
+#meson.add_install_script(py, files('scripts/install_user_data.py'), meson.project_source_root())

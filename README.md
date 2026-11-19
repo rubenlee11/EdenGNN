@@ -36,6 +36,8 @@ cd EdenGNN
 pip install .
 ```
 
+During the building process, Meson copies `scripts/` and `config.yaml` to `~/.edengnn/` and downloads the universal models in the Hugging Face repository `TrueSavage/EdenGNN`. Pseudopotential and orbital paths need to be configured by the user. 
+
 For offline installation, use:
 
 ```bash
@@ -49,6 +51,9 @@ Note that a fortran compiler (such as gfortran) is needed.
 - For performing non-self-consistent calculations in **OpenMX** 3.9 with predicted charge density, you need to recompile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
 
 - For performing non-self-consistent calculations in **ABACUS** 3.10.0 with predicted difference charge density, you need to recompile **ABACUS** with the patch files provided in `./scripts/abacus/patch_deltarho`.
+
+- For dataset generation, use `out_chg 3` to write `chgdelta.cube`. For prediction, use `init_chg drho` (also supported with `calculation nscf`): the patch reads the predicted difference density from `SPIN1_CHG.cube` in the charge read directory, then adds the atomic reference density.
+
 
 - For performing non-self-consistent calculations in **SIESTA** with predicted difference charge density, you need to compile it with **NetCDF** support.
 
@@ -171,7 +176,6 @@ This pre-trained models can be downloaded from the Hugging Face [repository](htt
 
 To use this pre-trained model for band structure predictions, firstly we need to compile the modified ABACUS code, install the corresponding pseudopotential and basis sets used in the training datasets.
 
-* Apply the patch by copying the contents of `scripts/abacus/patch_deltarho` to the source code directory of **ABACUS** v3.10.0, overwriting the existing files, and then compile it.
 
 * Download the SG15 pseudopotentials and the standard atomic orbitals from [here](https://abacus.ustc.edu.cn/pseudo/list.htm), and install them following the instructions in the ASE ABACUS [interface](https://gitlab.com/1041176461/ase-abacus). Ensure that ASE can access the pseudopotentials and basis sets through the environment variables `ABACUS_PP_PATH` and `ABACUS_ORBITAL_PATH`.
 

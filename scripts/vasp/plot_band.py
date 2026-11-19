@@ -7,18 +7,20 @@ Usage (activate the eqgnn environment first):
 Inputs:
     --filelist Required list of structure calculation directories, one per line.
     --band-dir Band calculation subdirectory (default: band).
-    --ylim     Energy limits in eV (default: -4 4).
+    --ylim     Offsets below VBM and above CBM, in eV (default: -4 4).
+    --gap-break Split gaps larger than this value in eV (default: 2).
     --dpi      Image resolution (default: 300).
     --nproc    Parallel plotting processes (default: 1).
 
 Reads band/vasprun.xml and band/KPOINTS. Supports explicit JSON-header KPOINTS
 from vasp_sad.py and standard VASP Line-mode KPOINTS. If nscf/ exists, reads
 nscf/vasprun.xml and draws the total DOS beside the bands, sharing the energy
-axis. Both use the band calculation's VBM (Fermi energy for metals) as zero.
+axis. Both use VBM (Ef for metals) as zero; gaps above 2 eV are broken.
 Saves band.png in each listed directory. Use stat.py for target comparisons.
 """
 
 import argparse
+import sys
 import json
 import multiprocessing
 import os
@@ -31,6 +33,10 @@ import numpy as np
 from pymatgen.electronic_structure.core import Spin
 from pymatgen.electronic_structure.plotter import BSPlotter
 from pymatgen.io.vasp.outputs import Vasprun
+
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plot_band_utils import plot_band_dos
 
 
 def _append_tick(tick_positions, tick_labels, position, label):
@@ -199,44 +205,25 @@ def get_band_data(workdir):
 
 
 def plot_band(dir_work, args):
-    """Save bands with an optional total DOS panel from the NSCF calculation."""
+    """Save a band/DOS plot spanning VBM-4 eV to CBM+4 eV by default."""
     dir_work = Path(dir_work)
     band = get_band_data(dir_work / args.band_dir)
     energy_zero = band["e_vbm"]
+    dos_energy_ev = dos_density = None
     path_nscf = dir_work / "nscf"
-    has_dos = path_nscf.is_dir()
-    dos = None
-    if has_dos:
+    if path_nscf.is_dir():
         dos = Vasprun(
             path_nscf / "vasprun.xml", parse_dos=True, parse_eigen=False,
             parse_projected_eigen=False, parse_potcar_file=False,
         ).tdos
-        fig, (ax, ax_dos) = plt.subplots(
-            1, 2, figsize=(6, 4), sharey=True,
-            gridspec_kw={"width_ratios": [3, 1], "wspace": 0.05},
-        )
-    else:
-        fig, ax = plt.subplots(figsize=(4, 4))
+        dos_energy_ev = dos.energies - energy_zero
+        dos_density = dos.get_densities()
+    fig = plot_band_dos(
+        band["distances"], [energy - energy_zero for energy in band["energies"]],
+        band["tick_positions"], band["tick_labels"], band["e_cbm"] - energy_zero,
+        dos_energy_ev, dos_density, args.ylim, args.gap_break,
+    )
     try:
-        for distance, energy in zip(band["distances"], band["energies"], strict=True):
-            ax.plot(distance, energy - energy_zero, color="blue", linewidth=1)
-        ax.set_xticks(band["tick_positions"])
-        ax.set_xticklabels(band["tick_labels"])
-        for position in band["tick_positions"]:
-            ax.axvline(position, color="grey", linewidth=0.5)
-        ax.axhline(0, color="grey", linewidth=0.5)
-        ax.set_ylabel("Energy (eV)")
-        ax.set_xlim(0, band["distances"][-1][-1])
-        ax.set_ylim(*args.ylim)
-        if has_dos:
-            ax_dos.plot(dos.get_densities(), dos.energies - energy_zero, color="blue", linewidth=1)
-            ax_dos.axhline(0, color="grey", linewidth=0.5)
-            ax_dos.set_xlabel("DOS (states/eV)")
-            ax_dos.set_xlim(left=0)
-            ax_dos.tick_params(axis="y", left=False)
-            fig.subplots_adjust(left=0.12, right=0.97, bottom=0.18, top=0.97)
-        else:
-            fig.tight_layout()
         fig.savefig(dir_work / "band.png", dpi=args.dpi)
     finally:
         plt.close(fig)
@@ -248,7 +235,8 @@ def main():
     )
     parser.add_argument("--filelist", required=True, type=Path, help="List of calculation directories")
     parser.add_argument("--band-dir", default="band", help="Band calculation subdirectory (default: band)")
-    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Energy limits in eV (default: -4 4)")
+    parser.add_argument("--ylim", nargs=2, type=float, default=(-4, 4), metavar=("MIN", "MAX"), help="Offsets below VBM and above CBM in eV (default: -4 4)")
+    parser.add_argument("--gap-break", type=float, default=2, help="Split gaps larger than this value in eV (default: 2)")
     parser.add_argument("--dpi", type=int, default=300, help="Image resolution (default: 300)")
     parser.add_argument("--nproc", type=int, default=1, help="Parallel plotting processes (default: 1)")
     args = parser.parse_args()

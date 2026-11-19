@@ -4,8 +4,7 @@ from vesin import NeighborList
 from pymatgen.core import Structure
 from torch_geometric.loader import DataLoader
 from torch_geometric.data import Data
-from pymatgen.io.vasp import Chgcar
-from edengnn.data.io.vasp.parse_density import parse_aug
+from edengnn.data.io.vasp.parse_density import _read_chgcar, parse_aug
 from edengnn.data.io.utils import get_mask_r, pos2n
 
 """-----------------------------------------------------------------------------
@@ -96,6 +95,10 @@ class AugDataset(torch.utils.data.Dataset):
         # load structure and density
         if self.use_bin:
             structure = Structure.from_file(os.path.join(path, "POSCAR"))
+            z = structure.atomic_numbers
+            pos = structure.cart_coords
+            cell = structure.lattice.matrix
+            volume = structure.lattice.volume
             aug_lines_in = np.load(os.path.join(path, "aug.npz"), allow_pickle=True)[
                 "data_aug"
             ].item()["total"]
@@ -105,16 +108,13 @@ class AugDataset(torch.utils.data.Dataset):
                     os.path.join(path_scf, "aug.npz"), allow_pickle=True
                 )["data_aug"].item()["total"]
         else:
-            chgcar_sad = Chgcar.from_file(os.path.join(path, "CHGCAR"))
-            structure = chgcar_sad.structure
-            aug_lines_in = chgcar_sad.data_aug["total"]
+            z, cell, pos, volume, _, aug_lines_in = _read_chgcar(
+                os.path.join(path, "CHGCAR")
+            )
             if not self.stage_predict:
-                chgcar = Chgcar.from_file(os.path.join(self.dir, f"{name}", "CHGCAR"))
-                aug_lines = chgcar.data_aug["total"]
-
-        z = structure.atomic_numbers
-        pos = structure.cart_coords
-        cell = structure.lattice.matrix
+                _, _, _, _, _, aug_lines = _read_chgcar(
+                    os.path.join(self.dir, f"{name}", "CHGCAR")
+                )
 
         # use vesin to determin the neighbor list
         nl = NeighborList(cutoff=self.cutoff, full_list=True)
@@ -151,7 +151,7 @@ class AugDataset(torch.utils.data.Dataset):
             name=name,
             nat=len(z),
             lmix_max=self.lmix_max,
-            volume=structure.lattice.volume,
+            volume=volume,
         )
 
 
