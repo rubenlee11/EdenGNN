@@ -20,7 +20,7 @@ class IO_OpenMX:
         self,
         stage="train",
         save_dir="",
-        path_template="",
+        path_input="",
         encut=220,
         num_proc=64,
         dk_bz=0.35,
@@ -37,10 +37,10 @@ class IO_OpenMX:
         self.dk_band = dk_band
         self.num_proc = num_proc
         self.plot_band = plot_band
-        self.path_template = path_template
+        self.path_input = path_input
 
-        if self.path_template is not None:
-            with open(self.path_template, "r") as f:
+        if self.path_input is not None:
+            with open(self.path_input, "r") as f:
                 self.template = f.read()
         else:
             self.template = ""

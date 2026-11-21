@@ -56,7 +56,7 @@ data:
 
   openmx:
     # [set]:
-    path_template: /path/to/openmx/template.dat 
+    path_input: /path/to/openmx/template.dat 
 
     # [default]: Cutoff energy in [Hartree] for specifying the real space grid 
     # density. See the scf.energycutoff tag in OpenMX.

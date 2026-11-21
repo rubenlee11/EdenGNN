@@ -36,7 +36,26 @@ cd EdenGNN
 pip install .
 ```
 
-During the building process, Meson copies `scripts/` and `config.yaml` to `~/.edengnn/` and downloads the universal models in the Hugging Face repository `TrueSavage/EdenGNN`. Pseudopotential and orbital paths need to be configured by the user. 
+The build script copies `scripts/` and `config.yaml` to `~/.edengnn/`, and downloads the universal models from the `TrueSavage/EdenGNN` repository on Hugging Face. To use [EdenGNN-Skill](https://github.com/rubenlee11/EdenGNN-Skill), configure the pseudopotentials and example job scripts in `~/.edengnn/` for your machine.
+
+```
+├── cpu.sh
+├── cuda.sh
+├── edengnn-uni
+│   ├── abacus
+│   │   └── pp.json
+│   └── vasp
+│       └── pp.json
+└── scripts
+    ├── abacus
+    │   ├── INPUT
+    │   ├── pp.json
+    │   └── submit.sh
+    └── vasp
+        ├── INCAR
+        ├── pp.json
+        ├── submit.sh
+```
 
 For offline installation, use:
 
@@ -50,17 +69,13 @@ Note that a fortran compiler (such as gfortran) is needed.
 
 - For performing non-self-consistent calculations in **OpenMX** 3.9 with predicted charge density, you need to recompile **OpenMX** with the patch files provided in `./scripts/openmx/patch_nsc`.
 
-- For performing non-self-consistent calculations in **ABACUS** 3.10.0 with predicted difference charge density, you need to recompile **ABACUS** with the patch files provided in `./scripts/abacus/patch_deltarho`.
-
-- For dataset generation, use `out_chg 3` to write `chgdelta.cube`. For prediction, use `init_chg drho` (also supported with `calculation nscf`): the patch reads the predicted difference density from `SPIN1_CHG.cube` in the charge read directory, then adds the atomic reference density.
-
+- For performing non-self-consistent calculations in **ABACUS** 3.10.0 with predicted difference charge density, you need to recompile **ABACUS** with the patch files provided in `./scripts/abacus/patch_deltarho`. For dataset generation, use `out_chg 3` to write `chgdelta.cube`. For prediction, use `init_chg drho` and `calculation nscf`. ABACUS then reads the predicted difference density from `SPIN1_CHG.cube` and construct the predicted Hamiltonian.
 
 - For performing non-self-consistent calculations in **SIESTA** with predicted difference charge density, you need to compile it with **NetCDF** support.
 
 ## Usage
 
 You can run **EdenGNN** examples directly in your browser using the Google Colab [link](https://colab.research.google.com/drive/1tSGPZk4XI71GEylYeNDD1218smOEaFKc?usp=sharing). Some trained model weights are stored at the Hugging Face [repository](https://huggingface.co/TrueSavage/EdenGNN), and example density files can be downloaded via this [link](https://huggingface.co/datasets/TrueSavage/EdenGNN-Data). Detailed parameter descriptions can be found in `config.yaml`.
-
 
 * **Important Note:** The following instructions are tailored for the VASP software using PAW pseudopotentials.
 
@@ -70,7 +85,7 @@ You can run **EdenGNN** examples directly in your browser using the Google Colab
 
 #### 1. Calculate Superposition of Atomic Charge Density (VASP only)
 
-This step is necessary for **VASP** but not **OpenMX**. In self-consistent and non-self-consistent calculations, **OpenMX** stores and reads the difference charge density in the restart files.
+This step is only necessary for **VASP** workflow. In self-consistent and non-self-consistent calculations, **OpenMX** and  **ABACUS** stores and reads the difference charge density in the restart files.
 
 Run **VASP** to obtain the Superposition of Atomic Charge Density (SACD). This serves as the physical prior for the $\Delta$-Learning strategy and is **required for both training and prediction**.
 - **VASP Tags:** Set `ICHARG = 12`, `NELM = 0`, and `ISPIN = 1`.
@@ -84,7 +99,7 @@ Perform normal self-consistent DFT calculations to generate the ground truth dat
 
 Create text files for training, validation, and test sets. 
 
-For **VASP** mode, the filelists should contain the absolute paths to the working directories of the **SACD** calculations.
+For **VASP** workflow, the filelists should contain the absolute paths to the working directories of the **SACD** calculations.
 
 Example:
 ```text
@@ -93,7 +108,7 @@ Example:
 ...
 ```
 
-For **OpenMX** mode, the filelists should contain the absolute paths to: the working directories of the DFT calculations in the training stage; or the cif files in the prediction stage.
+For other software workflows, the filelists should contain the absolute paths to: the working directories of the DFT calculations in the training stage; or the cif files in the prediction stage.
 
 Example:
 ```text
@@ -126,13 +141,12 @@ Modify your configuration file with the following key settings:
 
 - **Directories:** 
   - `run.save_dir`: Directory to save logs and checkpoints.
-  - `data.dir`: Directory storing your SCF calculations. Directory names here must match those in your filelists. This tag is needed when `data.dft_software` is `vasp`. 
   - `data.path_train` & `data.path_val`: Paths to your training and validation filelists.
+  - `data.vasp.dir`: Directory storing your **VASP** SCF calculations. The directory must contain the names which appear in your filelists.
 
 - **Optimization:** 
   - Set the initial learning rate via `optimize.lr`.
-  - The total loss is a weighted sum: $\mathcal{L} = \sum_{i} w_i \mathcal{L}_i$. Specify the gradient ratios in `optimize.loss_dict.grid_func_out` and `optimize.loss_dict.aug_tensor` if training both tasks (`run.task: 2`). When using **OpenMX**, only the charge density is trained, hence the weight of `grid_func_out` is `1.0`.
-
+  - The total loss is a weighted sum: $\mathcal{L} = \sum_{i} w_i \mathcal{L}_i$. Specify the gradient ratios in `optimize.loss_dict.grid_func_out` and `optimize.loss_dict.aug_tensor` if training both tasks (`run.task: 2`). When using norm conserving pseudopotentials, only the charge density is trained, hence the weight of `grid_func_out` is `1.0`.
 
 - **Model Parameters:** 
   - Set `model.lmix_max` to match the `LMAXMIX` tag used in your VASP dataset (must be consistent across all structures). 
@@ -153,7 +167,7 @@ edengnn-train --config path/to/config.yaml
 
 - **Set `path_predict`** to the filelist (explained in the **Data Preparation** section).
 
-- **Set `path_template`** to the path of the template files of band structure calculation settings for the DFT softwares.
+- **Set `path_input`** to the path of the template files of band structure calculation settings for the DFT softwares.
 
 - **Note:** All model hyperparameters in the `config.yaml` (including `run.task`) must strictly match those of the checkpoint.
 
@@ -176,8 +190,7 @@ This pre-trained models can be downloaded from the Hugging Face [repository](htt
 
 To use this pre-trained model for band structure predictions, firstly we need to compile the modified ABACUS code, install the corresponding pseudopotential and basis sets used in the training datasets.
 
-
-* Download the SG15 pseudopotentials and the standard atomic orbitals from [here](https://abacus.ustc.edu.cn/pseudo/list.htm), and install them following the instructions in the ASE ABACUS [interface](https://gitlab.com/1041176461/ase-abacus). Ensure that ASE can access the pseudopotentials and basis sets through the environment variables `ABACUS_PP_PATH` and `ABACUS_ORBITAL_PATH`.
+* Download the SG15 pseudopotentials and the standard atomic orbitals from [here](https://abacus.ustc.edu.cn/pseudo/list.htm), and config the `pp.json` accordingly.
 
 During the predicting stage, first configure the parameters for model prediction, and then execute band diagonalization using the modified **ABACUS** executable.
 
@@ -200,5 +213,5 @@ If you encounter with out of memory (OOM) errors when training or predicting the
 
 If you find EdenGNN useful in your research, please cite our paper:
 ```
-X. Li, Z. Xin, H. Yu, Y. Zhong, X. Gong, and H. Xiang, Efficient E(3)-Equivariant Framework for Universal Charge Density Prediction, arXiv:2510.00788.
+Li, X., Xin, Z., Yu, H. et al. Efficient equivariant framework for universal charge density prediction. Nat Mach Intell (2026). https://doi.org/10.1038/s42256-026-01326-5
 ```
