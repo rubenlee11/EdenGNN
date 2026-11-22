@@ -1,0 +1,64 @@
+site_name: EdenGNN Documentation
+site_description: Practical workflows for charge density, electronic structure, and optical properties with EdenGNN.
+site_url: https://rubenlee11.github.io/EdenGNN/
+repo_url: https://github.com/rubenlee11/EdenGNN
+repo_name: rubenlee11/EdenGNN
+edit_uri: edit/main/docs/
+
+# Keep generated HTML outside the source checkout by default.
+site_dir: !ENV [EDENGNN_DOCS_SITE_DIR, /tmp/edengnn-docs-site]
+
+theme:
+  name: material
+  language: en
+  font: false
+  icon:
+    logo: material/atom
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Overview: index.md
+  - Getting started:
+      - Installation and setup: setup.md
+  - Electronic structure:
+      - VASP universal model: vasp.md
+      - ABACUS universal model: abacus.md
+      - Train a custom model: training.md
+  - Optical properties:
+      - ABACUS and PyATB: optics.md
+  - Reference:
+      - Troubleshooting: troubleshooting.md
+      - Build and publish this site: publishing.md
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
