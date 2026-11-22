@@ -20,9 +20,7 @@
 
 ## Documentation
 
-For step-by-step instructions covering installation, VASP/ABACUS prediction, custom training, DFT comparisons, and PyATB optics, see the [English user guide](docs/index.md).
-
-The guide is configured as a [GitHub Pages documentation website](https://rubenlee11.github.io/EdenGNN/). See [build and publishing instructions](docs/publishing.md) to preview it locally or enable deployment.
+[Documentation](https://rubenlee11.github.io/EdenGNN/)
 
 ## Features
 

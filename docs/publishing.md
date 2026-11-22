@@ -1,49 +1,24 @@
-# Build and publish this documentation
+# Build and publish the documentation
 
-This documentation is a static site built with MkDocs Material. Markdown files in `docs/` are its content source; `mkdocs.yml` defines navigation, search, theme, and the GitHub project URL. Building the site does not require EdenGNN, CUDA, a DFT executable, or model downloads.
+The website uses MkDocs Material. Content is stored in `docs/`; navigation and theme settings are in `mkdocs.yml`.
 
-## Preview locally
+## Preview and build
 
-From the repository root, install the small, separate documentation dependency set. For example, create an environment outside the source tree:
+Install the dependencies in `requirements-docs.txt` in a separate Python environment. Use MkDocs `serve` for local preview or `build` with strict checking to generate the static website.
 
-```bash
-python -m venv /tmp/edengnn-docs-env
-source /tmp/edengnn-docs-env/bin/activate
-python -m pip install -r requirements-docs.txt
-mkdocs serve --dev-addr 127.0.0.1:8000
-```
+The default output directory is `/tmp/edengnn-docs-site/`. Set `EDENGNN_DOCS_SITE_DIR` or the `--site-dir` option to choose another location. Keep environments and generated HTML outside the source checkout.
 
-Open `http://127.0.0.1:8000/`. Pages rebuild when their Markdown source changes. The theme includes navigation, a page table of contents, full-text search, code-copy buttons, and light/dark modes.
+## Publish to GitHub Pages
 
-For a production build:
+1. Push the documentation and build configuration to `main`.
+2. In **Settings → Pages**, set **Source** to **GitHub Actions**.
+3. Open the [Documentation workflow](https://github.com/rubenlee11/EdenGNN/actions/workflows/docs.yml) and select **Run workflow**. Alternatively, rerun an existing Documentation job.
+4. Wait for the build and deployment jobs to succeed.
 
-```bash
-mkdocs build --strict --site-dir /tmp/edengnn-docs-site
-```
+The configured website is [rubenlee11.github.io/EdenGNN](https://rubenlee11.github.io/EdenGNN/). Documentation changes pushed to `main` deploy automatically. Pull requests check the build without deployment.
 
-The generated HTML is under `/tmp/edengnn-docs-site/`. The default configuration also writes outside the source checkout. Use `--site-dir` or the `EDENGNN_DOCS_SITE_DIR` environment variable to choose another output directory. Generated HTML and build environments do not belong in the source repository.
+## Update pages
 
-## Publish with GitHub Pages
+Edit the Markdown files and register new pages in `mkdocs.yml`. Use relative links between pages and check a strict build before publishing.
 
-The included `.github/workflows/docs.yml` builds the site and deploys a Pages artifact. It uses GitHub's artifact deployment instead of a generated `gh-pages` branch.
-
-1. Push the documentation files, `mkdocs.yml`, `requirements-docs.txt`, and the workflow to the repository's `main` branch.
-2. Open the GitHub repository's **Settings → Pages**. Under **Build and deployment → Source**, select **GitHub Actions**.
-3. In **Actions → Documentation**, run the workflow manually if the initial push happened before Pages was enabled.
-4. Wait for the build and deployment jobs to succeed. The deployment job reports the live URL.
-
-For `rubenlee11/EdenGNN`, the configured project-site URL is:
-
-```text
-https://rubenlee11.github.io/EdenGNN/
-```
-
-This is the expected URL after a successful deployment, not a claim that Pages is already enabled. Pull requests build the documentation for validation; they do not deploy it. Relevant changes pushed to `main` deploy automatically, and manual workflow dispatch is also supported.
-
-For a fork or a renamed repository, update `site_url`, `repo_url`, and `repo_name` in `mkdocs.yml`. If the default branch differs from `main`, also update the workflow branch filter, deployment condition, and `edit_uri`.
-
-## Edit the content
-
-Edit the corresponding Markdown file and add new pages to `nav` in `mkdocs.yml`. Use relative links between documentation pages so they work in both GitHub source views and the generated site. Run a strict build before publishing to catch missing page targets and configuration problems.
-
-Keep computation outputs, model weights, credentials, local pseudopotentials, and machine-specific job results outside `docs/`.
+For a renamed repository or fork, update the repository/site URLs in `mkdocs.yml`. Update the branch settings in the configuration and workflow if the default branch differs from `main`.

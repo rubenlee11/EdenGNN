@@ -37,17 +37,19 @@ theme:
 
 nav:
   - Overview: index.md
-  - Getting started:
-      - Installation and setup: setup.md
-  - Electronic structure:
-      - VASP universal model: vasp.md
-      - ABACUS universal model: abacus.md
-      - Train a custom model: training.md
-  - Optical properties:
-      - ABACUS and PyATB: optics.md
-  - Reference:
+  - Installation and setup: setup.md
+  - VASP:
+      - Train a model: vasp-training.md
+      - Predict with your model: vasp-prediction.md
+      - Use EdenGNN-Uni: vasp.md
+  - ABACUS:
+      - Train a model: abacus-training.md
+      - Predict with your model: abacus-prediction.md
+      - Use EdenGNN-Uni: abacus.md
+  - Additional topics:
+      - Optical properties: optics.md
       - Troubleshooting: troubleshooting.md
-      - Build and publish this site: publishing.md
+      - Build and publish: publishing.md
 
 plugins:
   - search
